@@ -1,131 +1,130 @@
 # ioBroker-NewGen
 
-> Preview auf ein hier entstehendes Projekt namens **ioBroker-NewGen**.
->
-> Aktueller Zustand: **In Entwicklung**.
+> Preview of an emerging project called **ioBroker-NewGen**.  
+> Current status: **In development**.
 
-## Kurzbeschreibung
+## Short Description
 
-**ioBroker-NewGen** ist eine modernisierte, stabile und objektorientierte Smarthome-Matrix als langfristige Weiterentwicklung des ioBroker-Ökosystems.
-Ziel ist eine klare Trennung zwischen Kernlogik, Adapter-Runtime, Routing und Benutzeroberfläche.
+**ioBroker-NewGen** is a modernized, stable, and object‑oriented C# smart home matrix designed as a long‑term evolution of the ioBroker ecosystem.  
+The goal is a clear separation between core logic, adapter runtime, routing, and user interface.
 
-## Ziele
+## Goals
 
-### Primäre Ziele
-- Ersetzen der historischen ioBroker-Architektur durch eine moderne C#-Zustandsmatrix
-- Isolierte Node.js-Runtimes für Legacy-Adapter
-- Einheitliche Adapter-API für alle Adaptertypen
-- Stabile, objektorientierte Echtzeit-State-Sync-Engine
-- Neues Admin-UI in C#
-- Langfristige Migration beliebter ioBroker-Adapter nach C#
+### Primary Goals
+- Replace the historical ioBroker architecture with a modern C# state matrix  
+- Isolated Node.js runtimes for legacy adapters  
+- Unified adapter API for all adapter types  
+- Stable, object‑oriented real‑time state‑sync engine  
+- New admin UI in C#  
+- Long‑term migration of popular ioBroker adapters to C#
 
-### Sekundäre Ziele
-- Kompatibilität zu bestehenden ioBroker-Adaptern, maximal 10 gleichzeitig
-- Minimale Hardware-Anforderungen für Raspberry Pi 5
-- Saubere Trennung zwischen internem und externem Routing
-- Modernes, modulares und erweiterbares System
+### Secondary Goals
+- Compatibility with existing ioBroker adapters, up to 10 simultaneously  
+- Minimal hardware requirements for Raspberry Pi 5  
+- Clean separation between internal and external routing  
+- Modern, modular, and extensible system
 
-## Architektur
+## Architecture
 
-### Kernkomponenten
-- **StateMatrix**: objektorientierte, thread-sichere Single Source of Truth
-- **SystemBus**: neutraler Datenbus ohne Kenntnis des Adaptertyps
-- **AdapterRouter**: entscheidet zwischen internem Transport und TCP-Bridge
-- **AdminUI**: C#-basierte Oberfläche für Objektbaum, Live-State, Adapter-Management und Logs
+### Core Components
+- **StateMatrix**: object‑oriented, thread‑safe single source of truth  
+- **SystemBus**: neutral data bus without knowledge of adapter type  
+- **AdapterRouter**: decides between internal transport and TCP bridge  
+- **AdminUI**: C#‑based interface for object tree, live state, adapter management, and logs
 
-### Adapter-Modell
-- **IAdapter** als gemeinsame Schnittstelle mit `Name`, `Id`, `Type`, `SendPayload` und `ReceivePayload`
-- **CustomAdapter**: C#-Assembly, host-intern, direkte Systembus-Nutzung
-- **IoBrokerAdapter**: isolierter Node.js-Prozess, Anbindung über TCP-Bridge
+### Adapter Model
+- **IAdapter** as common interface with `Name`, `Id`, `Type`, `SendPayload`, and `ReceivePayload`  
+- **CustomAdapter**: C# assembly, host‑internal, direct SystemBus usage  
+- **IoBrokerAdapter**: isolated Node.js process, connected via TCP bridge
 
-### State-Layer
-- Direkter Zugriff auf die Matrix
-- Validiertes Schreiben in die Matrix
-- Metadaten aus Adapter-Konstruktoren wie `min`, `max`, `type`, `role`, `unit`
-- Optionale Subscriptions über Event-Bus für Makro-Runtimes
+### State Layer
+- Direct access to the matrix  
+- Validated writes into the matrix  
+- Metadata from adapter constructors such as `min`, `max`, `type`, `role`, `unit`  
+- Optional subscriptions via event bus for macro runtimes
 
-### Objektbaum
-- Der Objektbaum wird aus der Matrix abgeleitet
-- Darstellung als JSON möglich
-- Deterministisch, stabil und vollständig inklusive Metadaten
+### Object Tree
+- Object tree is derived from the matrix  
+- Can be represented as JSON  
+- Deterministic, stable, and complete including metadata
 
 ### Rules Engine
-- Makro-Runtimes auf Basis von JavaScript und TypeScript
-- Event-getriebene Ausführung über den Event-Bus
-- Sandbox mit Zeitlimit, Memory-Limit, Zugriffsbeschränkungen und Crash-Recovery
+- Macro runtimes based on JavaScript and TypeScript  
+- Event‑driven execution via the event bus  
+- Sandbox with time limit, memory limit, access restrictions, and crash recovery
 
-### Weitere Bausteine
-- **History**: Adapter-seitige Historienverarbeitung über `OnStateChanged`
-- **Config System**: Laden, Speichern und optionale Validierung pro Adapter
-- **User/Role/Permission System**: Auth, Rollen, Rechte, Tokens und Sessions
-- **Backup System**: Snapshots, Dumps und optionale Cloud-Backups
+### Additional Modules
+- **History**: adapter‑side history processing via `OnStateChanged`  
+- **Config System**: loading, saving, and optional validation per adapter  
+- **User/Role/Permission System**: auth, roles, rights, tokens, and sessions  
+- **Backup System**: snapshots, dumps, and optional cloud backups
 
-## Hardware-Zielbild
+## Hardware Target
 
 ### Minimal
-- 4 Kerne ARM oder x86
-- 8 GB RAM
-- 64–128 GB SSD
-- Pi-5-kompatibel bei maximal 10 ioBroker-Adaptern
+- 4 cores ARM or x86  
+- 8 GB RAM  
+- 64–128 GB SSD  
+- Pi‑5 compatible with up to 10 ioBroker adapters
 
-### Empfohlen
-- 4–6 x86-Kerne
-- 16 GB RAM
+### Recommended
+- 4–6 x86 cores  
+- 16 GB RAM  
 - 128–256 GB SSD
 
 ### High-End
-- 8–12 Kerne
-- 32–64 GB RAM
+- 8–12 cores  
+- 32–64 GB RAM  
 - 256–512 GB NVMe
 
-## Migrationsstrategie
+## Migration Strategy
 
-1. Kritische Adapter migrieren
-2. Mittlere Adapter migrieren
-3. Kleine Adapter migrieren
-4. ioBroker-Adapter nur noch als Legacy-Feature anbieten
+1. Migrate critical adapters  
+2. Migrate medium adapters  
+3. Migrate small adapters  
+4. Offer ioBroker adapters only as a legacy feature
 
 ## Vision
 
-Ein modernes, stabiles, objektorientiertes Smarthome-System, das ioBroker langfristig ersetzt, aber kompatibel bleibt.
+A modern, stable, object‑oriented smart home system that replaces ioBroker in the long term while remaining compatible.
 
-Nicht als Konkurrenz zu Home Assistant, sondern als moderne Alternative für Entwickler und Power-User.
+Not a competitor to Home Assistant, but a modern alternative for developers and power users.
 
 ## Core Classes
 
-- **Matrix**: zentrale Speicherstruktur für Datenpunkte, Geräteobjekte und Metadaten
-- **BusFrame**: einheitliches Frame-Format für alle Adapter
-- **EventBus**: zentrales Event-Routing
-- **StateEngine**: API-Schicht über der Matrix
-- **ObjectTree**: abgeleitete hierarchische Darstellung aus der Matrix
-- **MacroRuntime**: Ausführung von JS/TS-Makros
-- **AdapterLoader**: Laden und Instanziieren von Adapter-Assemblies
-- **AdapterSupervisor**: Überwachung und Stabilisierung der Adapter
-- **AuthEngine**: User-, Rollen- und Rechteverwaltung
-- **BackupEngine**: Sicherung und Wiederherstellung des Systems
+- **Matrix**: central storage structure for datapoints, device objects, and metadata  
+- **BusFrame**: unified frame format for all adapters  
+- **EventBus**: central event routing  
+- **StateEngine**: API layer on top of the matrix  
+- **ObjectTree**: derived hierarchical representation from the matrix  
+- **MacroRuntime**: execution of JS/TS macros  
+- **AdapterLoader**: loading and instantiation of adapter assemblies  
+- **AdapterSupervisor**: monitoring and stabilizing adapters  
+- **AuthEngine**: user, role, and permission management  
+- **BackupEngine**: system backup and restore
 
-## MIT-Lizenz
+## MIT License
 
 The MIT License (MIT)
 
-Copyright (c) 2014-2026 bluefox <dogafox@gmail.com>,
-Copyright (c) 2014      hobbyquaker
-Copyright (c) 2026      MrRSEV - Richard Schumacher
+Copyright (c) 2014–2026 bluefox <dogafox@gmail.com>,  
+Copyright (c) 2014 hobbyquaker  
+Copyright (c) 2026 MrRSEV – Richard Schumacher
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
+Permission is hereby granted, free of charge, to any person obtaining a copy  
+of this software and associated documentation files (the "Software"), to deal  
+in the Software without restriction, including without limitation the rights  
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell  
+copies of the Software, and to permit persons to whom the Software is  
 furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in
+The above copyright notice and this permission notice shall be included in  
 all copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR  
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE  
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER  
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,  
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN  
 THE SOFTWARE.

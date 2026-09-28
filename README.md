@@ -65,7 +65,7 @@ The goal is a clear separation between core logic, adapter runtime, routing, and
 - 4 cores ARM or x86  
 - 8 GB RAM  
 - 64–128 GB SSD  
-- Pi‑5 compatible with up to 10 ioBroker adapters
+- Pi‑5 compatible with up to 10 ioBroker-js adapters
 
 ### Recommended
 - 4–6 x86 cores  

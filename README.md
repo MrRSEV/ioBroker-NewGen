@@ -5,10 +5,14 @@
 
 ## Short Description
 
-**ioBroker-NewGen** is a modernized, stable, and object‑oriented C# smart home matrix designed as a long‑term evolution of the ioBroker ecosystem.  
-The goal is a clear separation between core logic, adapter runtime, routing, and user interface.
+**ioBroker-NewGen** is a modern, stable, and object‑oriented C# smart home system built around a **neuronal storage** — a semantic vector matrix without any intelligence.  
+Objects, states, history samples, and metadata are *materialized views* extracted from this vector space.
 
-## Goals
+The goal is a clean separation between core logic, adapter runtime, routing, and user interface.
+
+---
+
+# Goals
 
 ### Primary Goals
 - Replace the historical ioBroker architecture with a modern C# state matrix  
@@ -19,89 +23,172 @@ The goal is a clear separation between core logic, adapter runtime, routing, and
 - Long‑term migration of popular ioBroker adapters to C#
 
 ### Secondary Goals
-- Compatibility with existing ioBroker adapters, up to 10 simultaneously  
+- Compatibility with existing ioBroker adapters (up to 10 simultaneously)  
 - Minimal hardware requirements for Raspberry Pi 5  
 - Clean separation between internal and external routing  
-- Modern, modular, and extensible system
+- Modular, extensible, future‑proof system design
 
-## Architecture
+---
 
-### Core Components
-- **StateMatrix**: object‑oriented, thread‑safe single source of truth  
-- **SystemBus**: neutral data bus without knowledge of adapter type  
-- **AdapterRouter**: decides between internal transport and TCP bridge  
-- **AdminUI**: C#‑based interface for object tree, live state, adapter management, and logs
+# Neuronal Storage (Semantic Vector Matrix)
 
-### Adapter Model
-- **IAdapter** as common interface with `Name`, `Id`, `Type`, `SendPayload`, and `ReceivePayload`  
-- **CustomAdapter**: C# assembly, host‑internal, direct SystemBus usage  
-- **IoBrokerAdapter**: isolated Node.js process, connected via TCP bridge
+The **Matrix** is not an object.  
+It is a **semantic vector space** — a neuronal storage layer that holds embeddings for objects, states, and history samples.
 
-### State Layer
-- Direct access to the matrix  
-- Validated writes into the matrix  
-- Metadata from adapter constructors such as `min`, `max`, `type`, `role`, `unit`  
-- Optional subscriptions via event bus for macro runtimes
+All visible structures (ObjectTree, StateNodes, History) are **projections** or **materialized views** derived from this vector space.
 
-### Object Tree
-- Object tree is derived from the matrix  
-- Can be represented as JSON  
-- Deterministic, stable, and complete including metadata
+## Matrix
 
-### Rules Engine
-- Macro runtimes based on JavaScript and TypeScript  
-- Event‑driven execution via the event bus  
-- Sandbox with time limit, memory limit, access restrictions, and crash recovery
+### Description
+Central semantic vector matrix for objects, states, embeddings, history, and persistence.  
+It acts as a high‑dimensional storage layer without any intelligence.
 
-### Additional Modules
-- **History**: adapter‑side history processing via `OnStateChanged`  
-- **Config System**: loading, saving, and optional validation per adapter  
-- **User/Role/Permission System**: auth, roles, rights, tokens, and sessions  
-- **Backup System**: snapshots, dumps, and optional cloud backups
+### Components
+- **objects** — materialized object views  
+- **states** — materialized state views  
+- **subscriptions** — callbacks for state changes  
+- **roleService** — permission validation  
+- **embeddingService** — text/payload embedding generator  
+- **semanticIndex** — vector index (e.g., HNSW)  
+- **snapshotPath** — path to JSONL snapshot file
 
-## Hardware Target
+### Lifecycle
+- **OnStart**  
+  Loads snapshot, reconstructs history samples, rebuilds embeddings, repopulates semantic index.
+- **OnStop**  
+  Writes a complete snapshot of all history samples.
+- **CronSnapshot**  
+  Periodically writes incremental snapshots.
 
-### Minimal
-- 4 cores ARM or x86  
-- 8 GB RAM  
-- 64–128 GB SSD  
-- Pi‑5 compatible with up to 10 ioBroker-js adapters
+### API
+- **RegisterObject(MatrixObject) -> bool**  
+  Generates object embedding, inserts into semantic index, creates a StateNode view.
 
-### Recommended
-- 4–6 x86 cores  
-- 16 GB RAM  
-- 128–256 GB SSD
+- **GetObject(string id) -> MatrixObject**  
+  Returns the materialized object view.
 
-### High-End
-- 8–12 cores  
-- 32–64 GB RAM  
-- 256–512 GB NVMe
+- **GetState(string id) -> StateNode**  
+  Returns the materialized state view.
 
-## Migration Strategy
+- **SetState(string id, object value, string user) -> bool**  
+  Validates permissions, generates payload embedding, updates state view, appends history sample, updates semantic index, triggers subscriptions.
 
-1. Migrate critical adapters  
-2. Migrate medium adapters  
-3. Migrate small adapters  
-4. Offer ioBroker adapters only as a legacy feature
+- **Subscribe(string id, Action<StateNode>)**  
+  Registers a callback for state changes.
 
-## Vision
+- **SemanticQuery(string text, int k) -> List<StateNode>**  
+  Encodes text into an embedding and performs k‑NN search.
 
-A modern, stable, object‑oriented smart home system that replaces ioBroker in the long term while remaining compatible.
+- **GetHistory(string id, DateTime? from, DateTime? to)**  
+  Returns history samples for the history.0 adapter.
 
-Not a competitor to Home Assistant, but a modern alternative for developers and power users.
+- **DisplayAsJson() -> string**  
+  Outputs the materialized object tree as JSON.
 
-## Core Classes
+- **WriteSnapshot()**  
+  Persists all history samples as JSONL.
 
-- **Matrix**: central storage structure for datapoints, device objects, and metadata  
-- **BusFrame**: unified frame format for all adapters  
-- **EventBus**: central event routing  
-- **StateEngine**: API layer on top of the matrix  
-- **ObjectTree**: derived hierarchical representation from the matrix  
-- **MacroRuntime**: execution of JS/TS macros  
-- **AdapterLoader**: loading and instantiation of adapter assemblies  
-- **AdapterSupervisor**: monitoring and stabilizing adapters  
-- **AuthEngine**: user, role, and permission management  
-- **BackupEngine**: system backup and restore
+---
+
+# Core Data Structures
+
+## MatrixObject
+
+### Description
+Represents a device, channel, or datapoint.  
+It is a **materialized projection** of embeddings stored in the Matrix.
+
+### Fields
+- **Id** — string  
+- **Name** — string  
+- **Type** — string  
+- **Meta** — dictionary of metadata
+
+### Embedding
+- **source**: `Id + Name + Type + Meta`  
+- **usage**: semantic identity of the object
+
+---
+
+## StateNode
+
+### Description
+Materialized view of the current state of an object.
+
+### Fields
+- **Id** — string  
+- **Value** — object  
+- **Timestamp** — DateTime  
+- **Embedding** — float[]  
+- **Meta** — metadata dictionary  
+- **History** — queue of history samples
+
+### Responsibilities
+- Holds current value  
+- Holds semantic payload embedding  
+- Holds history samples  
+- Is indexed in the vector index
+
+---
+
+## HistorySample
+
+### Description
+Represents a historical state value with timestamp and embedding.
+
+### Fields
+- **Id** — string  
+- **Timestamp** — DateTime  
+- **Value** — object  
+- **Embedding** — float[]
+
+### Usage
+- Persistent time series  
+- Semantic analysis over time  
+- Reconstruction of historical states  
+- Clustering, trends, anomaly detection
+
+---
+
+## VectorIndex
+
+### Description
+Semantic index for embeddings (e.g., HNSW).
+
+### API
+- **Add** — adds a state node embedding  
+- **Search** — k‑NN search
+
+---
+
+## IEmbeddingService
+
+### Description
+Generates embeddings from text or payload.
+
+### API
+- **Encode(string) -> float[]**
+
+---
+
+## IRoleService
+
+### Description
+Role and permission validation.
+
+### API
+- **CanWrite(user, stateId) -> bool**  
+- **CanRead(user, stateId) -> bool**
+
+---
+
+# Snapshot Format
+
+### Description
+JSONL file containing history samples.
+
+### Example
+```json { "Id": "temp.livingroom", "Timestamp": "2026-09-29T12:57:00Z", "Value": 22.5, "Embedding": [0.12, 0.88, ...] } ```
 
 ## MIT License
 

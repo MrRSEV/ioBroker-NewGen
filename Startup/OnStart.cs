@@ -1,23 +1,49 @@
 ﻿using RSEV.Utilities.Lifecycle;
 using RSEV.Utilities.Runtime;
+using ioBroker_NewGen.Controllers;
 
 namespace ioBroker_NewGen.Startup
 {
+    /// <summary>
+    /// Wird bei jedem Start des Systems ausgeführt (nach FirstRun, falls Erststart).
+    /// </summary>
     public class OnStart : IOnStart
     {
-        internal static async Task ExecuteAsync()
+        public async Task OnStartAsync(IRuntimeContext rtx)
         {
-            throw new NotImplementedException();
+            rtx.Logger.LogInfo("System wird gestartet...");
+            await ConfigLoader.LoadIfExistsAsync(rtx);
+
+            if (rtx is MainRuntimeContext mainContext)
+            {
+                var snapshotPath = System.IO.Path.Combine(AppContext.BaseDirectory, "snapshot.jsonl");
+                mainContext.InitializeMatrixAndBus(snapshotPath);
+                await mainContext.Matrix.LoadSnapshotAsync();
+                mainContext.Matrix.StartCronSnapshot(TimeSpan.FromMinutes(5));
+                rtx.Logger.LogInfo("SemanticStateMatrix, SystemBus und AdapterRouter initialisiert.");
+            }
+
+            rtx.IsRunning = true;
+            rtx.Logger.LogInfo("System erfolgreich gestartet.");
         }
 
-        public Task OnStartAsync(IRuntimeContext context)
+        void IOnStart.OnStart(IRuntimeContext rtx)
         {
-            throw new NotImplementedException();
-        }
+            rtx.Logger.LogInfo("System wird gestartet (synchron)...");
+            ConfigLoader.LoadIfExistsAsync(rtx).GetAwaiter().GetResult();
 
-        void IOnStart.OnStart(IRuntimeContext context)
-        {
-            throw new NotImplementedException();
+            if (rtx is MainRuntimeContext mainContext)
+            {
+                var snapshotPath = System.IO.Path.Combine(AppContext.BaseDirectory, "snapshot.jsonl");
+                mainContext.InitializeMatrixAndBus(snapshotPath);
+                mainContext.Matrix.LoadSnapshotAsync().GetAwaiter().GetResult();
+                mainContext.Matrix.StartCronSnapshot(TimeSpan.FromMinutes(5));
+                rtx.Logger.LogInfo("SemanticStateMatrix, SystemBus und AdapterRouter initialisiert.");
+            }
+
+            rtx.IsRunning = true;
+            rtx.Logger.LogInfo("System erfolgreich gestartet.");
         }
     }
 }
+

@@ -1,0 +1,54 @@
+====== ioBroker-NewGen – Projektdokumentation ======
+
+Diese Dokumentation beschreibt den aktuellen Entwicklungsstand des Projekts
+**ioBroker-CSharp-Fork (ioBroker-NewGen)** nach Abschluss von **Sprint 2 – TCP-Bridge & Legacy Runtime**.
+
+  * **Stand:** Version 0.1.0 (Tag ''dev-0.1.0'') + Sprint-2-Erweiterungen (noch ungetaggt)
+  * **Zielplattform:** .NET 9
+  * **Repository:** https://github.com/MrRSEV/ioBroker-NewGen
+
+Diese Seite dient als Einstiegspunkt (Startseite) für das DokuWiki unter ''/Doku''.
+Weitere Seiten:
+
+  * [[architektur|Architekturübersicht]]
+  * [[core-matrix|Core/Matrix – Semantische Zustandsmatrix]]
+  * [[core-bus|Core/Bus – Systembus]]
+  * [[core-routing|Core/Routing – AdapterRouter]]
+  * [[core-bridge|Core/Bridge – TCP-Bridge & Node.js-Adapter-Runtime]]
+  * [[core-registry|Core/Registry – AdapterRegistry]]
+  * [[runtime-lifecycle|Runtime & Lifecycle (FirstRun, OnStart, OnStop)]]
+  * [[konfiguration|Konfiguration (config.toml)]]
+  * [[sprintplan|Sprintplan & Roadmap]]
+  * [[changelog|Changelog]]
+
+===== Projektvision =====
+
+Eine modernisierte, stabile, objektorientierte Smarthome-Matrix als langfristige
+Weiterentwicklung des ioBroker-Ökosystems – nicht als Konkurrenz zu Home Assistant,
+sondern als moderne Alternative für Entwickler und Power-User.
+
+**Primäre Ziele:**
+  * Ersetzen der historischen ioBroker-Architektur durch eine moderne C#-Zustandsmatrix
+  * Isolierte Node.js-Runtimes für Legacy-Adapter
+  * Einheitliche Adapter-API für alle Adaptertypen
+  * Stabile, objektorientierte Echtzeit-State-Sync-Engine
+  * Neues Admin-UI in C#
+  * Langfristige Migration aller beliebten ioBroker-Adapter nach C#
+
+===== Aktueller Umsetzungsstand (Kurzüberblick) =====
+
+^ Bereich                     ^ Status        ^ Beschreibung ^
+| Runtime-Lifecycle           | ? Umgesetzt  | FirstRun / OnStart / OnStop über RSEV.Utilities |
+| Konfiguration (config.toml) | ? Umgesetzt  | Automatisches Erstellen + Laden in RSEV.Utilities-Config-Register |
+| Logging                     | ? Umgesetzt  | SystemLog schreibt latest.log im Basisverzeichnis |
+| SemanticStateMatrix         | ? Umgesetzt  | Objektbaum, States, History, Embeddings, Vektorindex, Snapshot-Persistenz |
+| SystemBus (BusFrame)        | ? Umgesetzt  | Publish/Subscribe über RSEV.Utilities.Messaging |
+| AdapterRouter                | ? Umgesetzt  | Custom ? intern, IoBroker ? TCP-Bridge (seit Sprint 2 aktiv) |
+| TCP-Bridge                  | ? Umgesetzt  | Framing-Protokoll, Handshake, Host?Adapter & Adapter?Host Transport |
+| AdapterRegistry              | ? Umgesetzt  | Name/Id/Type/Status/TcpEndpoint, automatische ID-Vergabe "Name.id" |
+| Node.js-Adapter-Runtime      | ? Umgesetzt  | Isolierte Prozesse über RSEV.Utilities.Processes, Crash-Recovery, Heartbeat |
+| CustomAdapter-API (IAdapter) | ? Offen      | Geplant für Sprint 3 |
+| AdminUI                     | ? Offen      | Geplant für Sprint 5 |
+| Adapter-Migrationen         | ? Offen      | Geplant ab Sprint 7 |
+
+Legende: ? fertig · ?? teilweise/Skeleton · ? noch nicht begonnen

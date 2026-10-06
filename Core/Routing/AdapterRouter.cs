@@ -1,5 +1,6 @@
 using System;
 using ioBroker_NewGen.Core.Bus;
+using ioBroker_NewGen.Core.Bridge;
 using RSEV.Utilities.Logging;
 
 namespace ioBroker_NewGen.Core.Routing
@@ -10,14 +11,15 @@ namespace ioBroker_NewGen.Core.Routing
     /// (über die TCP-Bridge, Legacy-ioBroker-Adapter) transportiert wird.
     /// </summary>
     /// <remarks>
-    /// Sprint-1-Skeleton: Die TCP-Bridge-Anbindung für <see cref="AdapterType.IoBroker"/>
-    /// folgt in Sprint 2. Bis dahin wird der Routing-Vorgang lediglich geloggt.
-    /// Externe Payloads werden gemäß Architektur 1:1 auf den Systembus gespiegelt.
+    /// Seit Sprint 2 ist die TCP-Bridge-Anbindung für <see cref="AdapterType.IoBroker"/>
+    /// aktiv (<see cref="TcpBridgeServer"/>). Externe Payloads werden gemäß
+    /// Architektur 1:1 auf den Systembus gespiegelt.
     /// </remarks>
     public sealed class AdapterRouter
     {
         private readonly SystemMessageBus _systemBus;
         private readonly ILogger _logger;
+        private TcpBridgeServer? _tcpBridge;
 
         public AdapterRouter(SystemMessageBus systemBus, ILogger logger)
         {
@@ -26,10 +28,20 @@ namespace ioBroker_NewGen.Core.Routing
         }
 
         /// <summary>
+        /// Verknüpft den Router mit der TCP-Bridge, sobald diese gestartet wurde.
+        /// Ohne verknüpfte Bridge werden <see cref="AdapterType.IoBroker"/>-Frames
+        /// nur geloggt (Fallback-Verhalten wie in Sprint 1).
+        /// </summary>
+        public void AttachTcpBridge(TcpBridgeServer tcpBridge)
+        {
+            _tcpBridge = tcpBridge ?? throw new ArgumentNullException(nameof(tcpBridge));
+        }
+
+        /// <summary>
         /// Routet ein Frame gemäß Adaptertyp:
         /// <list type="bullet">
         /// <item><see cref="AdapterType.Custom"/> ? direkt über den Systembus (intern).</item>
-        /// <item><see cref="AdapterType.IoBroker"/> ? TCP-Bridge (folgt Sprint 2, aktuell Platzhalter/Log).</item>
+        /// <item><see cref="AdapterType.IoBroker"/> ? TCP-Bridge an den Ziel-Adapter.</item>
         /// </list>
         /// </summary>
         public void Route(BusFrame frame, AdapterType adapterType)
@@ -67,11 +79,16 @@ namespace ioBroker_NewGen.Core.Routing
 
         private void RouteToTcpBridge(BusFrame frame)
         {
-            // TODO (Sprint 2): Anbindung an die TCP-Bridge zur Weiterleitung
-            // an isolierte Node.js-Adapter-Prozesse.
-            _logger.LogInfo(
-                $"[AdapterRouter] Frame für Adresse '{frame.Address}' von Adapter '{frame.AdapterId}' " +
-                "würde an die TCP-Bridge gehen (folgt in Sprint 2).");
+            if (_tcpBridge is null)
+            {
+                _logger.LogWarning(
+                    $"[AdapterRouter] Frame für Adresse '{frame.Address}' von Adapter '{frame.AdapterId}' " +
+                    "sollte an die TCP-Bridge gehen, es ist aber keine Bridge verknüpft.");
+                return;
+            }
+
+            // Zieladapter ist über frame.AdapterId adressiert (Format "Name.id").
+            _ = _tcpBridge.SendToAdapterAsync(frame.AdapterId, frame);
         }
     }
 }

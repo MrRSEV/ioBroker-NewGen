@@ -1,4 +1,4 @@
-﻿using RSEV.Utilities.Lifecycle;
+using RSEV.Utilities.Lifecycle;
 using RSEV.Utilities.Logging;
 using RSEV.Utilities.Runtime;
 using ioBroker_NewGen.Controllers;
@@ -6,7 +6,7 @@ using ioBroker_NewGen.Controllers;
 namespace ioBroker_NewGen.Startup
 {
     /// <summary>
-    /// Wird beim geordneten Herunterfahren des Systems ausgeführt.
+    /// Wird beim geordneten Herunterfahren des Systems ausgef�hrt.
     /// </summary>
     public class OnStop : IOnStop
     {
@@ -14,11 +14,17 @@ namespace ioBroker_NewGen.Startup
         {
             context.Logger.LogInfo("System wird heruntergefahren...");
 
-            if (context is MainRuntimeContext mainContext && mainContext.Matrix is not null)
+            if (context is MainRuntimeContext mainContext)
             {
-                mainContext.Matrix.StopCronSnapshot();
-                await mainContext.Matrix.WriteSnapshotAsync();
-                context.Logger.LogInfo("Snapshot der SemanticStateMatrix geschrieben.");
+                await mainContext.ShutdownBridgeAndNodeRuntimeAsync();
+                context.Logger.LogInfo("TCP-Bridge und Node.js-Adapter-Runtime gestoppt.");
+
+                if (mainContext.Matrix is not null)
+                {
+                    mainContext.Matrix.StopCronSnapshot();
+                    await mainContext.Matrix.WriteSnapshotAsync();
+                    context.Logger.LogInfo("Snapshot der SemanticStateMatrix geschrieben.");
+                }
             }
 
             context.IsRunning = false;
@@ -29,11 +35,17 @@ namespace ioBroker_NewGen.Startup
         {
             context.Logger.LogInfo("System wird heruntergefahren (synchron)...");
 
-            if (context is MainRuntimeContext mainContext && mainContext.Matrix is not null)
+            if (context is MainRuntimeContext mainContext)
             {
-                mainContext.Matrix.StopCronSnapshot();
-                mainContext.Matrix.WriteSnapshotAsync().GetAwaiter().GetResult();
-                context.Logger.LogInfo("Snapshot der SemanticStateMatrix geschrieben.");
+                mainContext.ShutdownBridgeAndNodeRuntimeAsync().GetAwaiter().GetResult();
+                context.Logger.LogInfo("TCP-Bridge und Node.js-Adapter-Runtime gestoppt.");
+
+                if (mainContext.Matrix is not null)
+                {
+                    mainContext.Matrix.StopCronSnapshot();
+                    mainContext.Matrix.WriteSnapshotAsync().GetAwaiter().GetResult();
+                    context.Logger.LogInfo("Snapshot der SemanticStateMatrix geschrieben.");
+                }
             }
 
             context.IsRunning = false;
@@ -41,4 +53,3 @@ namespace ioBroker_NewGen.Startup
         }
     }
 }
-

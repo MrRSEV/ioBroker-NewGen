@@ -1,11 +1,11 @@
-﻿using RSEV.Utilities.Lifecycle;
+using RSEV.Utilities.Lifecycle;
 using RSEV.Utilities.Runtime;
 using ioBroker_NewGen.Controllers;
 
 namespace ioBroker_NewGen.Startup
 {
     /// <summary>
-    /// Wird bei jedem Start des Systems ausgeführt (nach FirstRun, falls Erststart).
+    /// Wird bei jedem Start des Systems ausgef�hrt (nach FirstRun, falls Erststart).
     /// </summary>
     public class OnStart : IOnStart
     {
@@ -21,6 +21,16 @@ namespace ioBroker_NewGen.Startup
                 await mainContext.Matrix.LoadSnapshotAsync();
                 mainContext.Matrix.StartCronSnapshot(TimeSpan.FromMinutes(5));
                 rtx.Logger.LogInfo("SemanticStateMatrix, SystemBus und AdapterRouter initialisiert.");
+
+                var port = rtx.Config.Get<int>("ipc.ipcPort");
+                if (port <= 0)
+                {
+                    port = 5001;
+                }
+
+                await mainContext.StartTcpBridgeAsync(port);
+                mainContext.InitializeNodeRuntime();
+                rtx.Logger.LogInfo($"TCP-Bridge auf Port {port} gestartet, Node.js-Adapter-Runtime initialisiert.");
             }
 
             rtx.IsRunning = true;
@@ -39,6 +49,16 @@ namespace ioBroker_NewGen.Startup
                 mainContext.Matrix.LoadSnapshotAsync().GetAwaiter().GetResult();
                 mainContext.Matrix.StartCronSnapshot(TimeSpan.FromMinutes(5));
                 rtx.Logger.LogInfo("SemanticStateMatrix, SystemBus und AdapterRouter initialisiert.");
+
+                var port = rtx.Config.Get<int>("ipc.ipcPort");
+                if (port <= 0)
+                {
+                    port = 5001;
+                }
+
+                mainContext.StartTcpBridgeAsync(port).GetAwaiter().GetResult();
+                mainContext.InitializeNodeRuntime();
+                rtx.Logger.LogInfo($"TCP-Bridge auf Port {port} gestartet, Node.js-Adapter-Runtime initialisiert.");
             }
 
             rtx.IsRunning = true;
@@ -46,4 +66,3 @@ namespace ioBroker_NewGen.Startup
         }
     }
 }
-

@@ -4,6 +4,8 @@ using RSEV.Utilities.Runtime;
 using ioBroker_NewGen.Core.Matrix;
 using ioBroker_NewGen.Core.Bus;
 using ioBroker_NewGen.Core.Routing;
+using ioBroker_NewGen.Core.Registry;
+using ioBroker_NewGen.Core.Bridge;
 
 namespace ioBroker_NewGen.Controllers
 {
@@ -18,7 +20,7 @@ namespace ioBroker_NewGen.Controllers
         private static readonly Lazy<MainRuntimeContext> _instance = new(() => new MainRuntimeContext());
 
         /// <summary>
-        /// Die einzige Instanz des MainRuntimeContext fÃ¼r den gesamten Prozess.
+        /// Die einzige Instanz des MainRuntimeContext für den gesamten Prozess.
         /// </summary>
         public static MainRuntimeContext Instance => _instance.Value;
 
@@ -35,10 +37,26 @@ namespace ioBroker_NewGen.Controllers
         public SystemMessageBus SystemBus { get; private set; } = null!;
 
         /// <summary>
-        /// Entscheidet, ob Frames intern (Custom-Adapter) oder Ã¼ber die
+        /// Entscheidet, ob Frames intern (Custom-Adapter) oder über die
         /// TCP-Bridge (ioBroker-Legacy-Adapter) geroutet werden.
         /// </summary>
         public AdapterRouter AdapterRouter { get; private set; } = null!;
+
+        /// <summary>
+        /// Zentrale Registry aller bekannten Adapter (Custom + ioBroker-Legacy)
+        /// inkl. Status, TCP-Endpunkt bzw. Instanzreferenz.
+        /// </summary>
+        public AdapterRegistry AdapterRegistry { get; private set; } = null!;
+
+        /// <summary>
+        /// TCP-Bridge-Server für isolierte Legacy-ioBroker-Adapter (Node.js-Prozesse).
+        /// </summary>
+        public TcpBridgeServer? TcpBridge { get; private set; }
+
+        /// <summary>
+        /// Verwaltet isolierte Node.js-Adapterprozesse (Start, Crash-Recovery, Heartbeat).
+        /// </summary>
+        public NodeAdapterRuntime? NodeRuntime { get; private set; }
 
         private MainRuntimeContext()
         {
@@ -60,11 +78,57 @@ namespace ioBroker_NewGen.Controllers
             }
 
             AdapterRouter ??= new AdapterRouter(SystemBus, Logger);
+            AdapterRegistry ??= new AdapterRegistry();
+        }
+
+        /// <summary>
+        /// Startet die TCP-Bridge (Sprint 2) auf dem übergebenen Port und
+        /// verknüpft sie mit dem <see cref="AdapterRouter"/>, sodass Frames
+        /// für <see cref="AdapterType.IoBroker"/> tatsächlich zugestellt werden.
+        /// Erwartet, dass <see cref="InitializeMatrixAndBus"/> zuvor aufgerufen wurde.
+        /// </summary>
+        public async Task StartTcpBridgeAsync(int port)
+        {
+            if (TcpBridge is not null)
+            {
+                return;
+            }
+
+            TcpBridge = new TcpBridgeServer(port, AdapterRegistry, SystemBus, Logger);
+            await TcpBridge.StartAsync();
+            AdapterRouter.AttachTcpBridge(TcpBridge);
+        }
+
+        /// <summary>
+        /// Initialisiert die Node.js-Adapter-Runtime (Sprint 2) auf Basis von
+        /// <see cref="RSEV.Utilities.Processes.RuntimeProcessController"/> (aus <see cref="ProcessController"/>)
+        /// und startet die periodische Health-Überwachung/Crash-Recovery.
+        /// </summary>
+        public void InitializeNodeRuntime()
+        {
+            NodeRuntime ??= new NodeAdapterRuntime(ProcessController, AdapterRegistry, Logger);
+            NodeRuntime.StartHealthMonitoring();
+        }
+
+        /// <summary>
+        /// Stoppt TCP-Bridge und Node.js-Adapter-Runtime (z. B. beim Systemstopp).
+        /// </summary>
+        public async Task ShutdownBridgeAndNodeRuntimeAsync()
+        {
+            if (NodeRuntime is not null)
+            {
+                await NodeRuntime.StopAllAsync();
+            }
+
+            if (TcpBridge is not null)
+            {
+                await TcpBridge.StopAsync();
+            }
         }
 
         /// <summary>
         /// Erstellt das Konfigurationsregister des RSEV.Utilities-Frameworks.
-        /// Die Instanz wird von BaseRuntimeContext wÃ¤hrend der Initialisierung
+        /// Die Instanz wird von BaseRuntimeContext während der Initialisierung
         /// dieses RuntimeContext registriert.
         /// </summary>
         protected override IConfig CreateDefaultConfig()

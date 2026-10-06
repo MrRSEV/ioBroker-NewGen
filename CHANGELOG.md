@@ -1,9 +1,9 @@
 # Changelog
 
-Alle wesentlichen Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
+All significant changes to this project are documented in this file.
 
-Das Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
-und dieses Projekt folgt sinngemäß [Semantic Versioning](https://semver.org/lang/de/).
+The format follows the principles of [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project loosely adheres to [Semantic Versioning](https://semver.org/).
 
 ## [0.2.0] - 2026-10-05
 
@@ -25,24 +25,24 @@ und dieses Projekt folgt sinngemäß [Semantic Versioning](https://semver.org/lang
 
 ## [0.1.0] - 2026-10-05
 
-### Hinzugefügt
-- Grundgerüst des Runtime-Lifecycles (`FirstRun`, `OnStart`, `OnStop`) auf Basis von RSEV.Utilities.
-- `MainRuntimeContext` als applikationsweiter Singleton-`RuntimeContext` inkl. eigenem Logger (`SystemLog`, schreibt `latest.log` in das Basisverzeichnis) und Konfigurationsregister (`ConfConfig`).
-- `ConfigCreator` zum automatischen Anlegen einer Standard-`config.toml` beim Erststart.
-- `ConfigLoader` zum Einlesen der `config.toml` in das RSEV.Utilities-Konfigurationsregister beim Systemstart, inklusive automatischem Zurücksetzen von `firstrun` auf `false`.
-- `UnexpectedUserExitHandler` zur sauberen Behandlung von CTRL+C, Konsolen-Schließen sowie Windows-Shutdown-/Logoff-Events mit garantiertem `OnStop`-Aufruf.
-- **Core/Matrix** – Semantische Zustands- und Referenzmatrix (`SemanticStateMatrix`):
-  - `MatrixObject`, `StateNode`, `HistorySample` als Kernmodelle des Objektbaums.
-  - `IEmbeddingService` / `HashingEmbeddingService` für deterministische semantische Embeddings.
-  - `IVectorIndex` / `VectorIndex` für semantische Ähnlichkeitssuche (Kosinus-Similarity).
-  - `IRoleService` / `DefaultRoleService` für Lese-/Schreibrechte pro Benutzer und State.
-  - Vollständige JSONL-Snapshot-Persistenz (`LoadSnapshotAsync`, `WriteSnapshotAsync`, periodischer `StartCronSnapshot`).
+### Added
+- Basic framework of the runtime lifecycle (`FirstRun`, `OnStart`, `OnStop`) based on RSEV.Utilities.
+- `MainRuntimeContext` as an application-wide singleton `RuntimeContext`, including its own logger (`SystemLog`, writes `latest.log` into the base directory) and configuration registry (`ConfConfig`).
+- `ConfigCreator` for automatically creating a default `config.toml` on first startup.
+- `ConfigLoader` for loading `config.toml` into the RSEV.Utilities configuration registry during system startup, including automatic resetting of `firstrun` to `false`.
+- `UnexpectedUserExitHandler` for clean handling of CTRL+C, console-close events, and Windows shutdown/logoff events with guaranteed invocation of `OnStop`.
+- **Core/Matrix** â€“ Semantic state and reference matrix (`SemanticStateMatrix`):
+  - `MatrixObject`, `StateNode`, `HistorySample` as core models of the object tree.
+  - `IEmbeddingService` / `HashingEmbeddingService` for deterministic semantic embeddings.
+  - `IVectorIndex` / `VectorIndex` for semantic similarity search (cosine similarity).
+  - `IRoleService` / `DefaultRoleService` for read/write permissions per user and state.
+  - Full JSONL snapshot persistence (`LoadSnapshotAsync`, `WriteSnapshotAsync`, periodic `StartCronSnapshot`).
   - API: `RegisterObject`, `GetObject`, `GetState`, `SetState`, `Subscribe`/`Unsubscribe`, `SemanticQuery`, `GetHistory`, `DisplayAsJson`.
-- **Core/Bus** – Zentraler neutraler Systembus:
-  - `BusFrame`-Record (AdapterId, Address, Payload, ValueType, Kind, Timestamp, Metadata).
-  - `SystemMessageBus` (basierend auf `RSEV.Utilities.Messaging.BaseMessageBus`) mit thread-sicherem Publish/Subscribe inkl. Wildcard-Abonnements.
-- **Core/Routing** – `AdapterRouter`-Skeleton zur Unterscheidung zwischen internem Routing (`CustomAdapter`) und TCP-Bridge-Routing (`IoBrokerAdapter`, folgt in einer späteren Version).
-- Registrierung von `SemanticStateMatrix`, `SystemMessageBus` und `AdapterRouter` im `MainRuntimeContext`, Initialisierung beim Systemstart sowie automatisches Schreiben des finalen Snapshots beim Herunterfahren.
+- **Core/Bus** â€“ Central neutral system bus:
+  - `BusFrame` record (AdapterId, Address, Payload, ValueType, Kind, Timestamp, Metadata).
+  - `SystemMessageBus` (based on `RSEV.Utilities.Messaging.BaseMessageBus`) with threadâ€‘safe publish/subscribe including wildcard subscriptions.
+- **Core/Routing** â€“ `AdapterRouter` skeleton to distinguish between internal routing (`CustomAdapter`) and TCPâ€‘bridge routing (`IoBrokerAdapter`, coming in a later version).
+- Registration of `SemanticStateMatrix`, `SystemMessageBus`, and `AdapterRouter` in `MainRuntimeContext`, initialization during system startup, and automatic writing of the final snapshot during shutdown.
 
 [0.2.0]: https://github.com/MrRSEV/ioBroker-NewGen/releases/tag/dev-0.2.0
 [0.1.0]: https://github.com/MrRSEV/ioBroker-NewGen/releases/tag/dev-0.1.0

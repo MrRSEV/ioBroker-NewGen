@@ -10,8 +10,8 @@ namespace ioBroker_NewGen.Core.Bridge
 {
     /// <summary>
     /// Framing-Schicht des TCP-Bridge-Protokolls: kompaktes JSON pro Nachricht,
-    /// mit einem 4-Byte-Big-Endian-Längenpräfix, damit Nachrichtengrenzen
-    /// zuverlässig über den TCP-Stream erkannt werden (keine Nachrichtenfragmentierung).
+    /// mit einem 4-Byte-Big-Endian-Lï¿½ngenprï¿½fix, damit Nachrichtengrenzen
+    /// zuverlï¿½ssig ï¿½ber den TCP-Stream erkannt werden (keine Nachrichtenfragmentierung).
     /// </summary>
     public static class BridgeProtocol
     {
@@ -22,7 +22,7 @@ namespace ioBroker_NewGen.Core.Bridge
 
         /// <summary>
         /// Serialisiert ein <see cref="BridgeEnvelope"/> und schreibt es mit
-        /// Längenpräfix auf den übergebenen Stream.
+        /// Lï¿½ngenprï¿½fix auf den ï¿½bergebenen Stream.
         /// </summary>
         public static async Task WriteAsync(NetworkStream stream, BridgeEnvelope envelope, CancellationToken cancellationToken = default)
         {
@@ -42,7 +42,7 @@ namespace ioBroker_NewGen.Core.Bridge
 
         /// <summary>
         /// Liest ein <see cref="BridgeEnvelope"/> vom Stream (blockierend bis eine
-        /// vollständige Nachricht vorliegt), oder <c>null</c>, wenn die Verbindung
+        /// vollstï¿½ndige Nachricht vorliegt), oder <c>null</c>, wenn die Verbindung
         /// sauber beendet wurde.
         /// </summary>
         public static async Task<BridgeEnvelope?> ReadAsync(NetworkStream stream, CancellationToken cancellationToken = default)
@@ -61,7 +61,7 @@ namespace ioBroker_NewGen.Core.Bridge
             var length = BitConverter.ToInt32(lengthBuffer, 0);
             if (length <= 0 || length > 16 * 1024 * 1024)
             {
-                throw new InvalidDataException($"Ungültige Nachrichtenlänge im TCP-Bridge-Protokoll: {length}");
+                throw new InvalidDataException($"Ungï¿½ltige Nachrichtenlï¿½nge im TCP-Bridge-Protokoll: {length}");
             }
 
             var payloadBuffer = new byte[length];

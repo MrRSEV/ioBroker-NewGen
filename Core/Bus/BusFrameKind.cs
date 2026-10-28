@@ -15,13 +15,13 @@ namespace ioBroker_NewGen.Core.Bus
     }
 
     /// <summary>
-    /// Zusätzliche, optionale Metadaten eines <see cref="BusFrame"/>
-    /// (z. B. für Routing-Entscheidungen oder Korrelation von Anfragen/Antworten).
+    /// Zusï¿½tzliche, optionale Metadaten eines <see cref="BusFrame"/>
+    /// (z. B. fï¿½r Routing-Entscheidungen oder Korrelation von Anfragen/Antworten).
     /// </summary>
     public sealed class BusFrameMetadata
     {
         /// <summary>
-        /// Beliebige Schlüssel-Wert-Paare (z. B. "correlationId", "replyTo").
+        /// Beliebige Schlï¿½ssel-Wert-Paare (z. B. "correlationId", "replyTo").
         /// </summary>
         public Dictionary<string, string> Values { get; init; } = new();
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using ioBroker_NewGen.Core.Events;
 using ioBroker_NewGen.Core.Routing;
 
 namespace ioBroker_NewGen.Core.Registry
@@ -15,6 +16,12 @@ namespace ioBroker_NewGen.Core.Registry
         private readonly ConcurrentDictionary<string, AdapterRegistration> _adaptersById = new();
         private readonly ConcurrentDictionary<string, int> _instanceCounters = new();
         private readonly object _idLock = new();
+        private readonly SystemEventBus? _eventBus;
+
+        public AdapterRegistry(SystemEventBus? eventBus = null)
+        {
+            _eventBus = eventBus;
+        }
 
         /// <summary>
         /// Registriert einen neuen Adapter und vergibt, falls noch keine ID gesetzt ist,
@@ -37,11 +44,14 @@ namespace ioBroker_NewGen.Core.Registry
             };
 
             _adaptersById[id] = registration;
+            _eventBus?.PublishAdapterLifecycle(
+                this,
+                new AdapterLifecycleEventArgs(registration, AdapterStatus.Created));
             return registration;
         }
 
         /// <summary>
-        /// Vergibt die nächste freie Instanz-ID für den übergebenen Adapternamen
+        /// Vergibt die nï¿½chste freie Instanz-ID fï¿½r den ï¿½bergebenen Adapternamen
         /// (Format "Name.id", z. B. "mqtt.0", "mqtt.1", ...).
         /// </summary>
         public string AssignNextId(string name)
@@ -54,7 +64,7 @@ namespace ioBroker_NewGen.Core.Registry
         }
 
         /// <summary>
-        /// Liefert den registrierten Adapter zur übergebenen ID, oder <c>null</c>, falls unbekannt.
+        /// Liefert den registrierten Adapter zur ï¿½bergebenen ID, oder <c>null</c>, falls unbekannt.
         /// </summary>
         public AdapterRegistration? Get(string id)
         {
@@ -62,7 +72,7 @@ namespace ioBroker_NewGen.Core.Registry
         }
 
         /// <summary>
-        /// Prüft, ob ein Adapter mit der übergebenen ID existiert.
+        /// Prï¿½ft, ob ein Adapter mit der ï¿½bergebenen ID existiert.
         /// </summary>
         public bool Exists(string id) => _adaptersById.ContainsKey(id);
 
@@ -80,6 +90,22 @@ namespace ioBroker_NewGen.Core.Registry
         }
 
         /// <summary>
+        /// Liefert eine noch nicht an einen TCP-Endpunkt gebundene Instanz mit
+        /// dem angegebenen Namen. Damit kann ein von NodeAdapterRuntime
+        /// vorregistrierter Prozess beim Bridge-Handshake dieselbe Name.id-ID
+        /// weiterverwenden.
+        /// </summary>
+        public AdapterRegistration? FindUnbound(string name, AdapterType type)
+        {
+            return _adaptersById.Values
+                .Where(adapter => adapter.Type == type &&
+                                  string.Equals(adapter.Name, name, StringComparison.OrdinalIgnoreCase) &&
+                                  string.IsNullOrWhiteSpace(adapter.TcpEndpoint))
+                .OrderBy(adapter => adapter.Id, StringComparer.Ordinal)
+                .FirstOrDefault();
+        }
+
+        /// <summary>
         /// Entfernt einen Adapter aus der Registry (z. B. nach Verbindungsabbruch).
         /// </summary>
         public bool Unregister(string id)
@@ -94,10 +120,18 @@ namespace ioBroker_NewGen.Core.Registry
         {
             if (_adaptersById.TryGetValue(id, out var registration))
             {
+                var previousStatus = registration.Status;
                 registration.Status = status;
                 if (touchLastSeen)
                 {
                     registration.LastSeenAt = DateTime.UtcNow;
+                }
+
+                if (previousStatus != status)
+                {
+                    _eventBus?.PublishAdapterLifecycle(
+                        this,
+                        new AdapterLifecycleEventArgs(registration, previousStatus));
                 }
             }
         }

@@ -3,9 +3,9 @@ using System;
 namespace ioBroker_NewGen.Core.Matrix
 {
     /// <summary>
-    /// Datei-basiertes JSONL-Format (eine History-Sample pro Zeile) für den
+    /// Datei-basiertes JSONL-Format (eine History-Sample pro Zeile) fï¿½r den
     /// Snapshot-Mechanismus der <see cref="SemanticStateMatrix"/>.
-    /// Append-only, kompakt, schnell zu laden – siehe Spezifikation "SnapshotFormat".
+    /// Append-only, kompakt, schnell zu laden ï¿½ siehe Spezifikation "SnapshotFormat".
     /// </summary>
     internal sealed class SnapshotEntry
     {
@@ -15,8 +15,8 @@ namespace ioBroker_NewGen.Core.Matrix
         public float[] Embedding { get; set; } = Array.Empty<float>();
 
         /// <summary>
-        /// Wird nur für den jeweils letzten Eintrag eines States beim Laden
-        /// verwendet, um Meta-Informationen des zugehörigen Objekts zu bewahren.
+        /// Wird nur fï¿½r den jeweils letzten Eintrag eines States beim Laden
+        /// verwendet, um Meta-Informationen des zugehï¿½rigen Objekts zu bewahren.
         /// </summary>
         public string? Name { get; set; }
         public string? Type { get; set; }

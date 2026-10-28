@@ -1,4 +1,4 @@
-﻿using RSEV.Utilities.Lifecycle;
+using RSEV.Utilities.Lifecycle;
 using RSEV.Utilities.Runtime;
 
 namespace ioBroker_NewGen.Startup

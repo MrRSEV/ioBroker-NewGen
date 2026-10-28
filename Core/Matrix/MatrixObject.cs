@@ -4,9 +4,9 @@ using System.Linq;
 namespace ioBroker_NewGen.Core.Matrix
 {
     /// <summary>
-    /// Beschreibt ein Gerät, einen Kanal oder einen Datenpunkt innerhalb der
-    /// <see cref="SemanticStateMatrix"/>. Dient als Identitätsträger für
-    /// einen oder mehrere <see cref="StateNode"/>-Einträge.
+    /// Beschreibt ein Gerï¿½t, einen Kanal oder einen Datenpunkt innerhalb der
+    /// <see cref="SemanticStateMatrix"/>. Dient als Identitï¿½tstrï¿½ger fï¿½r
+    /// einen oder mehrere <see cref="StateNode"/>-Eintrï¿½ge.
     /// </summary>
     public sealed class MatrixObject
     {
@@ -26,12 +26,17 @@ namespace ioBroker_NewGen.Core.Matrix
         public required string Type { get; init; }
 
         /// <summary>
-        /// Beliebige zusätzliche Metadaten (Rolle, Einheit, Hersteller etc.).
+        /// Beliebige zusï¿½tzliche Metadaten (Rolle, Einheit, Hersteller etc.).
         /// </summary>
         public Dictionary<string, string> Meta { get; init; } = new();
 
         /// <summary>
-        /// Baut den Text zusammen, der als Grundlage für das semantische
+        /// Optionale Validierungs- und Semantikdefinition des zugehÃ¶rigen States.
+        /// </summary>
+        public StateDefinition? StateDefinition { get; init; }
+
+        /// <summary>
+        /// Baut den Text zusammen, der als Grundlage fï¿½r das semantische
         /// Objekt-Embedding verwendet wird (Id + Name + Type + Meta).
         /// </summary>
         public string BuildEmbeddingSourceText()

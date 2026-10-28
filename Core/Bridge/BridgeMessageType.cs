@@ -11,7 +11,7 @@ namespace ioBroker_NewGen.Core.Bridge
         Handshake,
 
         /// <summary>
-        /// Host ? Adapter: Bestätigt den Handshake und teilt die vergebene ID mit.
+        /// Host ? Adapter: Bestï¿½tigt den Handshake und teilt die vergebene ID mit.
         /// </summary>
         HandshakeAck,
 
@@ -21,7 +21,7 @@ namespace ioBroker_NewGen.Core.Bridge
         Frame,
 
         /// <summary>
-        /// Bidirektional: Lebenszeichen zur Verbindungsüberwachung.
+        /// Bidirektional: Lebenszeichen zur Verbindungsï¿½berwachung.
         /// </summary>
         Heartbeat,
 

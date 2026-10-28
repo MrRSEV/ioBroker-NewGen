@@ -5,7 +5,7 @@ using ioBroker_NewGen.Controllers;
 namespace ioBroker_NewGen.Startup
 {
     /// <summary>
-    /// Wird bei jedem Start des Systems ausgeführt (nach FirstRun, falls Erststart).
+    /// Wird bei jedem Start des Systems ausgefï¿½hrt (nach FirstRun, falls Erststart).
     /// </summary>
     public class OnStart : IOnStart
     {
@@ -28,9 +28,67 @@ namespace ioBroker_NewGen.Startup
                     port = 5001;
                 }
 
-                await mainContext.StartTcpBridgeAsync(port);
-                mainContext.InitializeNodeRuntime();
-                rtx.Logger.LogInfo($"TCP-Bridge auf Port {port} gestartet, Node.js-Adapter-Runtime initialisiert.");
+                var bindHost = rtx.Config.Get<string>("ipc.ipcHost");
+                if (string.IsNullOrWhiteSpace(bindHost))
+                {
+                    bindHost = "127.0.0.1";
+                }
+
+                var healthCheckIntervalMs = rtx.Config.Get<int>("adapter.adapterHealthCheckIntervalMs");
+                if (healthCheckIntervalMs <= 0)
+                {
+                    healthCheckIntervalMs = 5000;
+                }
+
+                var crashRestartDelayMs = rtx.Config.Get<int>("adapter.adapterCrashRestartDelayMs");
+                if (crashRestartDelayMs < 0)
+                {
+                    crashRestartDelayMs = 2000;
+                }
+
+                await mainContext.StartTcpBridgeAsync(port, bindHost);
+                mainContext.InitializeNodeRuntime(
+                    TimeSpan.FromMilliseconds(crashRestartDelayMs),
+                    TimeSpan.FromMilliseconds(healthCheckIntervalMs));
+
+                var adapterRootPath = rtx.Config.Get<string>("adapter.adapterRootPath");
+                if (string.IsNullOrWhiteSpace(adapterRootPath))
+                {
+                    adapterRootPath = "Adapters";
+                }
+
+                if (!Path.IsPathRooted(adapterRootPath))
+                {
+                    adapterRootPath = Path.Combine(AppContext.BaseDirectory, adapterRootPath);
+                }
+
+                if (rtx.Config.Get<bool>("adapter.legacyAutoStart"))
+                {
+                    var legacyDirectory = Path.Combine(adapterRootPath, "IOBroker");
+                    await mainContext.NodeRuntime!.StartDirectoryAsync(legacyDirectory, bindHost, port);
+                }
+
+                mainContext.InitializeAdapterDeployment(adapterRootPath);
+                mainContext.InitializeBackupService();
+                mainContext.InitializeCustomAdapterRuntime();
+                var customAdapterRuntime = mainContext.CustomAdapterRuntime!;
+                var adapterDirectory = rtx.Config.Get<string>("adapter.customAdapterDirectory");
+                if (string.IsNullOrWhiteSpace(adapterDirectory))
+                {
+                    adapterDirectory = Path.Combine(AppContext.BaseDirectory, "Adapters", "custom");
+                }
+                else if (!Path.IsPathRooted(adapterDirectory))
+                {
+                    adapterDirectory = Path.Combine(AppContext.BaseDirectory, adapterDirectory);
+                }
+                var adapterAutoStart = rtx.Config.Get<bool>("adapter.adapterAutoStart");
+                if (adapterAutoStart && !string.IsNullOrWhiteSpace(adapterDirectory))
+                {
+                    customAdapterRuntime.LoadAdapters(adapterDirectory);
+                    await customAdapterRuntime.StartAllAsync();
+                }
+
+                rtx.Logger.LogInfo($"TCP-Bridge auf {bindHost}:{port} gestartet, Node.js-Adapter-Runtime initialisiert.");
             }
 
             rtx.IsRunning = true;
@@ -56,9 +114,67 @@ namespace ioBroker_NewGen.Startup
                     port = 5001;
                 }
 
-                mainContext.StartTcpBridgeAsync(port).GetAwaiter().GetResult();
-                mainContext.InitializeNodeRuntime();
-                rtx.Logger.LogInfo($"TCP-Bridge auf Port {port} gestartet, Node.js-Adapter-Runtime initialisiert.");
+                var bindHost = rtx.Config.Get<string>("ipc.ipcHost");
+                if (string.IsNullOrWhiteSpace(bindHost))
+                {
+                    bindHost = "127.0.0.1";
+                }
+
+                var healthCheckIntervalMs = rtx.Config.Get<int>("adapter.adapterHealthCheckIntervalMs");
+                if (healthCheckIntervalMs <= 0)
+                {
+                    healthCheckIntervalMs = 5000;
+                }
+
+                var crashRestartDelayMs = rtx.Config.Get<int>("adapter.adapterCrashRestartDelayMs");
+                if (crashRestartDelayMs < 0)
+                {
+                    crashRestartDelayMs = 2000;
+                }
+
+                mainContext.StartTcpBridgeAsync(port, bindHost).GetAwaiter().GetResult();
+                mainContext.InitializeNodeRuntime(
+                    TimeSpan.FromMilliseconds(crashRestartDelayMs),
+                    TimeSpan.FromMilliseconds(healthCheckIntervalMs));
+
+                var adapterRootPath = rtx.Config.Get<string>("adapter.adapterRootPath");
+                if (string.IsNullOrWhiteSpace(adapterRootPath))
+                {
+                    adapterRootPath = "Adapters";
+                }
+
+                if (!Path.IsPathRooted(adapterRootPath))
+                {
+                    adapterRootPath = Path.Combine(AppContext.BaseDirectory, adapterRootPath);
+                }
+
+                if (rtx.Config.Get<bool>("adapter.legacyAutoStart"))
+                {
+                    var legacyDirectory = Path.Combine(adapterRootPath, "IOBroker");
+                    mainContext.NodeRuntime!.StartDirectoryAsync(legacyDirectory, bindHost, port).GetAwaiter().GetResult();
+                }
+
+                mainContext.InitializeAdapterDeployment(adapterRootPath);
+                mainContext.InitializeBackupService();
+                mainContext.InitializeCustomAdapterRuntime();
+                var customAdapterRuntime = mainContext.CustomAdapterRuntime!;
+                var adapterDirectory = rtx.Config.Get<string>("adapter.customAdapterDirectory");
+                if (string.IsNullOrWhiteSpace(adapterDirectory))
+                {
+                    adapterDirectory = Path.Combine(AppContext.BaseDirectory, "Adapters", "custom");
+                }
+                else if (!Path.IsPathRooted(adapterDirectory))
+                {
+                    adapterDirectory = Path.Combine(AppContext.BaseDirectory, adapterDirectory);
+                }
+                var adapterAutoStart = rtx.Config.Get<bool>("adapter.adapterAutoStart");
+                if (adapterAutoStart && !string.IsNullOrWhiteSpace(adapterDirectory))
+                {
+                    customAdapterRuntime.LoadAdapters(adapterDirectory);
+                    customAdapterRuntime.StartAllAsync().GetAwaiter().GetResult();
+                }
+
+                rtx.Logger.LogInfo($"TCP-Bridge auf {bindHost}:{port} gestartet, Node.js-Adapter-Runtime initialisiert.");
             }
 
             rtx.IsRunning = true;

@@ -6,11 +6,11 @@ using System.Collections.Generic;
 namespace ioBroker_NewGen.Core.Matrix
 {
     /// <summary>
-    /// Thread-sicherer, voll funktionsfähiger semantischer Index auf Basis
-    /// von Brute-Force-Kosinus-Ähnlichkeit. Für die erwarteten Datenmengen
+    /// Thread-sicherer, voll funktionsfï¿½higer semantischer Index auf Basis
+    /// von Brute-Force-Kosinus-ï¿½hnlichkeit. Fï¿½r die erwarteten Datenmengen
     /// einer Smarthome-Installation (zehntausende States) ausreichend performant;
-    /// kann später durch eine echte ANN-Struktur (z. B. HNSW) ersetzt werden,
-    /// ohne dass Aufrufer (<see cref="SemanticStateMatrix"/>) angepasst werden müssen.
+    /// kann spï¿½ter durch eine echte ANN-Struktur (z. B. HNSW) ersetzt werden,
+    /// ohne dass Aufrufer (<see cref="SemanticStateMatrix"/>) angepasst werden mï¿½ssen.
     /// </summary>
     public sealed class VectorIndex : IVectorIndex
     {

@@ -1,4 +1,4 @@
-﻿using RSEV.Utilities.Runtime;
+using RSEV.Utilities.Runtime;
 
 namespace ioBroker_NewGen.Runtime
 {

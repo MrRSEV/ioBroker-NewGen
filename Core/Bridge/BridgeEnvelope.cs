@@ -5,8 +5,8 @@ namespace ioBroker_NewGen.Core.Bridge
 {
     /// <summary>
     /// Leichtgewichtiges Transport-Envelope des TCP-Bridge-Protokolls.
-    /// Wird als kompaktes JSON über den Draht geschickt (siehe <see cref="BridgeProtocol"/>
-    /// für das Framing mit 4-Byte-Längenpräfix).
+    /// Wird als kompaktes JSON ï¿½ber den Draht geschickt (siehe <see cref="BridgeProtocol"/>
+    /// fï¿½r das Framing mit 4-Byte-Lï¿½ngenprï¿½fix).
     /// </summary>
     public sealed class BridgeEnvelope
     {
@@ -33,17 +33,17 @@ namespace ioBroker_NewGen.Core.Bridge
 
         /// <summary>
         /// Art des transportierten Frames (siehe <see cref="ioBroker_NewGen.Core.Bus.BusFrameKind"/>),
-        /// als int übertragen, um das Bus-Modell nicht direkt an den Draht zu koppeln.
+        /// als int ï¿½bertragen, um das Bus-Modell nicht direkt an den Draht zu koppeln.
         /// </summary>
         public int FrameKind { get; set; }
 
         /// <summary>
-        /// Payload, Base64-kodiert (kompaktes JSON-Protokoll statt reinem Binärformat).
+        /// Payload, Base64-kodiert (kompaktes JSON-Protokoll statt reinem Binï¿½rformat).
         /// </summary>
         public string? PayloadBase64 { get; set; }
 
         /// <summary>
-        /// Zusätzliche Metadaten (Key/Value), z. B. correlationId.
+        /// Zusï¿½tzliche Metadaten (Key/Value), z. B. correlationId.
         /// </summary>
         public System.Collections.Generic.Dictionary<string, string>? Metadata { get; set; }
 

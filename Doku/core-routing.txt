@@ -1,4 +1,4 @@
-====== Core/Routing – AdapterRouter ======
+====== Core/Routing ï¿½ AdapterRouter ======
 
 Namespace: ''ioBroker_NewGen.Core.Routing''
 
@@ -7,35 +7,35 @@ Namespace: ''ioBroker_NewGen.Core.Routing''
 <code csharp>
 public enum AdapterType
 {
-    Custom,    // nativer C#-Adapter, Host-intern, direkt über Systembus
+    Custom,    // nativer C#-Adapter, Host-intern, direkt ï¿½ber Systembus
     IoBroker   // Legacy ioBroker-Adapter, isolierter Node.js-Prozess, TCP-Bridge
 }
 </code>
 
 ===== AdapterRouter =====
 
-Entscheidet anhand des Adaptertyps, ob ein ''BusFrame'' intern (direkt über den
-''SystemMessageBus'') oder extern (über die TCP-Bridge) transportiert wird.
+Entscheidet anhand des Adaptertyps, ob ein ''BusFrame'' intern (direkt ï¿½ber den
+''SystemMessageBus'') oder extern (ï¿½ber die TCP-Bridge) transportiert wird.
 
 ^ Methode                                                   ^ Beschreibung ^
 | ''Route(BusFrame frame, AdapterType adapterType)''        | Routing-Entscheidung: Custom ? intern, IoBroker ? TCP-Bridge |
 | ''RouteExternalPayload(BusFrame frame)''                  | Spiegelt ein von extern empfangenes Payload 1:1 auf den Systembus |
-| ''AttachTcpBridge(TcpBridgeServer tcpBridge)''            | Verknüpft den Router mit der laufenden TCP-Bridge (Sprint 2) |
+| ''AttachTcpBridge(TcpBridgeServer tcpBridge)''            | Verknï¿½pft den Router mit der laufenden TCP-Bridge (Sprint 2) |
 
 **Implementierungsstand seit Sprint 2:**
 
-  * ''AdapterType.Custom'' ? ''frame'' wird direkt via ''SystemMessageBus.Publish(frame)'' veröffentlicht.
-  * ''AdapterType.IoBroker'' ? sofern eine TCP-Bridge über ''AttachTcpBridge'' verknüpft wurde,
-    wird das Frame über ''TcpBridgeServer.SendToAdapterAsync(frame.AdapterId, frame)'' an den
-    konkreten, per ID adressierten Legacy-Adapter zugestellt. Ist keine Bridge verknüpft
+  * ''AdapterType.Custom'' ? ''frame'' wird direkt via ''SystemMessageBus.Publish(frame)'' verï¿½ffentlicht.
+  * ''AdapterType.IoBroker'' ? sofern eine TCP-Bridge ï¿½ber ''AttachTcpBridge'' verknï¿½pft wurde,
+    wird das Frame ï¿½ber ''TcpBridgeServer.SendToAdapterAsync(frame.AdapterId, frame)'' an den
+    konkreten, per ID adressierten Legacy-Adapter zugestellt. Ist keine Bridge verknï¿½pft
     (z. B. in Tests oder vor der Initialisierung), wird stattdessen eine Warnung geloggt
     (Fallback-Verhalten).
 
-Die Verknüpfung mit der Bridge erfolgt automatisch beim Systemstart über
+Die Verknï¿½pfung mit der Bridge erfolgt automatisch beim Systemstart ï¿½ber
 ''MainRuntimeContext.StartTcpBridgeAsync(port)'' (siehe [[core-bridge]]).
 
-===== Weiterführende Details =====
+===== Weiterfï¿½hrende Details =====
 
-Das vollständige TCP-Bridge-Protokoll (Handshake, Framing, Node.js-Adapter-Runtime
+Das vollstï¿½ndige TCP-Bridge-Protokoll (Handshake, Framing, Node.js-Adapter-Runtime
 mit Crash-Recovery) ist in [[core-bridge]] beschrieben. Die zentrale Verwaltung
 aller Adapter (Name, ID, Status, Endpunkt) in [[core-registry]].

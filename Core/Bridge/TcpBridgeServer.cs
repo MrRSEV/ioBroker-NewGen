@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -13,14 +14,15 @@ using RSEV.Utilities.Logging;
 namespace ioBroker_NewGen.Core.Bridge
 {
     /// <summary>
-    /// TCP-Bridge-Server für isolierte Legacy-ioBroker-Adapter (Node.js-Prozesse).
-    /// Lauscht auf einem festen Host-Port, führt den Handshake durch (Adapter sendet
-    /// Namen, Host vergibt ID im Format "Name.id") und transportiert anschließend
+    /// TCP-Bridge-Server fï¿½r isolierte Legacy-ioBroker-Adapter (Node.js-Prozesse).
+    /// Lauscht auf einem festen Host-Port, fï¿½hrt den Handshake durch (Adapter sendet
+    /// Namen, Host vergibt ID im Format "Name.id") und transportiert anschlieï¿½end
     /// <see cref="BusFrame"/>-Payloads bidirektional zwischen Adapter und Systembus.
     /// </summary>
     public sealed class TcpBridgeServer : IAsyncDisposable
     {
         private readonly int _port;
+        private readonly IPAddress _bindAddress;
         private readonly AdapterRegistry _adapterRegistry;
         private readonly SystemMessageBus _systemBus;
         private readonly ILogger _logger;
@@ -30,13 +32,50 @@ namespace ioBroker_NewGen.Core.Bridge
         private TcpListener? _listener;
         private CancellationTokenSource? _cts;
         private Task? _acceptLoopTask;
+        private Timer? _heartbeatTimer;
+        private readonly TimeSpan _heartbeatTimeout;
 
         public TcpBridgeServer(int port, AdapterRegistry adapterRegistry, SystemMessageBus systemBus, ILogger logger)
+            : this(port, IPAddress.Loopback, adapterRegistry, systemBus, logger)
         {
+        }
+
+        public TcpBridgeServer(
+            int port,
+            string bindHost,
+            AdapterRegistry adapterRegistry,
+            SystemMessageBus systemBus,
+            ILogger logger,
+            TimeSpan? heartbeatTimeout = null)
+            : this(
+                port,
+                ResolveBindAddress(bindHost),
+                adapterRegistry,
+                systemBus,
+                logger,
+                heartbeatTimeout)
+        {
+        }
+
+        private TcpBridgeServer(
+            int port,
+            IPAddress bindAddress,
+            AdapterRegistry adapterRegistry,
+            SystemMessageBus systemBus,
+            ILogger logger,
+            TimeSpan? heartbeatTimeout = null)
+        {
+            if (port is < 1 or > 65535)
+            {
+                throw new ArgumentOutOfRangeException(nameof(port), "Port muss zwischen 1 und 65535 liegen.");
+            }
+
             _port = port;
+            _bindAddress = bindAddress;
             _adapterRegistry = adapterRegistry ?? throw new ArgumentNullException(nameof(adapterRegistry));
             _systemBus = systemBus ?? throw new ArgumentNullException(nameof(systemBus));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _heartbeatTimeout = heartbeatTimeout ?? TimeSpan.FromSeconds(30);
         }
 
         /// <summary>
@@ -45,22 +84,29 @@ namespace ioBroker_NewGen.Core.Bridge
         public Task StartAsync()
         {
             _cts = new CancellationTokenSource();
-            _listener = new TcpListener(IPAddress.Any, _port);
+            _listener = new TcpListener(_bindAddress, _port);
             _listener.Start();
 
-            _logger.LogInfo($"[TcpBridge] Lauscht auf Port {_port}.");
+            _logger.LogInfo($"[TcpBridge] Lauscht auf {_bindAddress}:{_port}.");
 
             _acceptLoopTask = AcceptLoopAsync(_cts.Token);
+            _heartbeatTimer = new Timer(
+                _ => DisconnectStaleConnections(),
+                state: null,
+                dueTime: _heartbeatTimeout,
+                period: TimeSpan.FromSeconds(Math.Max(1, _heartbeatTimeout.TotalSeconds / 2)));
             return Task.CompletedTask;
         }
 
         /// <summary>
-        /// Stoppt den Listener und schließt alle aktiven Verbindungen.
+        /// Stoppt den Listener und schlieï¿½t alle aktiven Verbindungen.
         /// </summary>
         public async Task StopAsync()
         {
             _cts?.Cancel();
             _listener?.Stop();
+            _heartbeatTimer?.Dispose();
+            _heartbeatTimer = null;
 
             if (_acceptLoopTask is not null)
             {
@@ -142,19 +188,34 @@ namespace ioBroker_NewGen.Core.Bridge
                 var handshake = await connection.ReadAsync(cancellationToken);
                 if (handshake is null || handshake.Type != BridgeMessageType.Handshake || string.IsNullOrWhiteSpace(handshake.AdapterId))
                 {
-                    _logger.LogWarning("[TcpBridge] Ungültiger oder fehlender Handshake – Verbindung wird getrennt.");
+                    _logger.LogWarning("[TcpBridge] Ungï¿½ltiger oder fehlender Handshake ï¿½ Verbindung wird getrennt.");
                     await connection.DisposeAsync();
                     return;
                 }
 
                 var adapterName = handshake.AdapterId;
-                var registration = _adapterRegistry.Register(adapterName, AdapterType.IoBroker);
+                var candidates = _adapterRegistry.GetByType(AdapterType.IoBroker)
+                    .Where(candidate => string.Equals(candidate.Name, adapterName, StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(candidate => candidate.Id, StringComparer.Ordinal)
+                    .ToArray();
+                var registration = candidates.FirstOrDefault(candidate =>
+                                      string.IsNullOrWhiteSpace(candidate.TcpEndpoint) ||
+                                      candidate.Status is AdapterStatus.Disconnected or AdapterStatus.Faulted)
+                                  ?? (candidates.Length == 1 ? candidates[0] : null)
+                                  ?? _adapterRegistry.Register(adapterName, AdapterType.IoBroker);
+
+                _connectionsByAdapterId.TryGetValue(registration.Id, out var previousConnection);
+                _connectionsByAdapterId[registration.Id] = connection;
+                if (previousConnection is not null && !ReferenceEquals(previousConnection, connection))
+                {
+                    await previousConnection.DisposeAsync();
+                }
+
                 adapterId = registration.Id;
                 registration.TcpEndpoint = client.Client.RemoteEndPoint?.ToString();
                 _adapterRegistry.UpdateStatus(adapterId, AdapterStatus.Connected);
 
                 connection.AdapterId = adapterId;
-                _connectionsByAdapterId[adapterId] = connection;
 
                 await connection.SendAsync(new BridgeEnvelope
                 {
@@ -166,6 +227,22 @@ namespace ioBroker_NewGen.Core.Bridge
 
                 await ReceiveLoopAsync(connection, adapterId, cancellationToken);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogDebug($"[TcpBridge] Verbindung von Adapter '{adapterId ?? "unbekannt"}' beim Herunterfahren beendet.");
+            }
+            catch (IOException ex)
+            {
+                _logger.LogDebug($"[TcpBridge] Adapter '{adapterId ?? "unbekannt"}' hat die Verbindung geschlossen: {ex.Message}");
+            }
+            catch (SocketException ex)
+            {
+                _logger.LogDebug($"[TcpBridge] Netzwerkverbindung von Adapter '{adapterId ?? "unbekannt"}' beendet: {ex.Message}");
+            }
+            catch (ObjectDisposedException)
+            {
+                _logger.LogDebug($"[TcpBridge] Verbindung von Adapter '{adapterId ?? "unbekannt"}' wurde geschlossen.");
+            }
             catch (Exception ex)
             {
                 _logger.LogError($"[TcpBridge] Fehler in Verbindung (Adapter '{adapterId ?? "unbekannt"}'): {ex.Message}");
@@ -174,8 +251,19 @@ namespace ioBroker_NewGen.Core.Bridge
             {
                 if (adapterId is not null)
                 {
-                    _connectionsByAdapterId.TryRemove(adapterId, out _);
-                    _adapterRegistry.UpdateStatus(adapterId, AdapterStatus.Disconnected);
+                    var ownsCurrentConnection = _connectionsByAdapterId.TryGetValue(adapterId, out var currentConnection) &&
+                                                ReferenceEquals(currentConnection, connection);
+                    if (ownsCurrentConnection)
+                    {
+                        _connectionsByAdapterId.TryRemove(adapterId, out _);
+                        if (_adapterRegistry.Get(adapterId) is { } registration)
+                        {
+                            // Ein Neustart desselben Legacy-Prozesses soll seine
+                            // bestehende Name.id-IdentitÃ¤t wiederverwenden.
+                            registration.TcpEndpoint = null;
+                            _adapterRegistry.UpdateStatus(adapterId, AdapterStatus.Disconnected);
+                        }
+                    }
                     _logger.LogInfo($"[TcpBridge] Adapter '{adapterId}' getrennt.");
                 }
 
@@ -203,7 +291,7 @@ namespace ioBroker_NewGen.Core.Bridge
                         break;
 
                     case BridgeMessageType.Heartbeat:
-                        // Lebenszeichen wurde bereits über LastSeenAt/UpdateStatus verarbeitet.
+                        // Lebenszeichen wurde bereits ï¿½ber LastSeenAt/UpdateStatus verarbeitet.
                         break;
 
                     case BridgeMessageType.Error:
@@ -221,7 +309,7 @@ namespace ioBroker_NewGen.Core.Bridge
         {
             if (string.IsNullOrEmpty(envelope.Address))
             {
-                _logger.LogWarning($"[TcpBridge] Frame von Adapter '{adapterId}' ohne Adresse empfangen – wird verworfen.");
+                _logger.LogWarning($"[TcpBridge] Frame von Adapter '{adapterId}' ohne Adresse empfangen ï¿½ wird verworfen.");
                 return;
             }
 
@@ -240,8 +328,44 @@ namespace ioBroker_NewGen.Core.Bridge
                 envelope.Timestamp,
                 metadata);
 
-            // Externe Payloads werden gemäß Architektur 1:1 auf den Systembus gespiegelt.
+            // Externe Payloads werden gemï¿½ï¿½ Architektur 1:1 auf den Systembus gespiegelt.
             _systemBus.Publish(frame);
+        }
+
+        private void DisconnectStaleConnections()
+        {
+            var threshold = DateTime.UtcNow - _heartbeatTimeout;
+            foreach (var (adapterId, connection) in _connectionsByAdapterId.ToList())
+            {
+                if (connection.LastSeenAt >= threshold)
+                {
+                    continue;
+                }
+
+                _logger.LogWarning($"[TcpBridge] Adapter '{adapterId}' hat seit {_heartbeatTimeout} kein Lebenszeichen gesendet.");
+                _ = connection.DisposeAsync();
+            }
+        }
+
+        private static IPAddress ResolveBindAddress(string bindHost)
+        {
+            if (string.IsNullOrWhiteSpace(bindHost) || string.Equals(bindHost, "localhost", StringComparison.OrdinalIgnoreCase))
+            {
+                return IPAddress.Loopback;
+            }
+
+            if (string.Equals(bindHost, "*", StringComparison.Ordinal) || string.Equals(bindHost, "0.0.0.0", StringComparison.Ordinal))
+            {
+                return IPAddress.Any;
+            }
+
+            if (IPAddress.TryParse(bindHost, out var address))
+            {
+                return address;
+            }
+
+            return Dns.GetHostAddresses(bindHost).FirstOrDefault(address => address.AddressFamily == AddressFamily.InterNetwork)
+                ?? throw new ArgumentException($"Bind-Adresse '{bindHost}' konnte nicht aufgelÃ¶st werden.", nameof(bindHost));
         }
 
         public async ValueTask DisposeAsync()

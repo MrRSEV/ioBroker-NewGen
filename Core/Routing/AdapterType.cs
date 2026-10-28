@@ -6,13 +6,13 @@ namespace ioBroker_NewGen.Core.Routing
     public enum AdapterType
     {
         /// <summary>
-        /// Nativer C#-Adapter, läuft Host-intern, direkt über den Systembus.
+        /// Nativer C#-Adapter, lï¿½uft Host-intern, direkt ï¿½ber den Systembus.
         /// </summary>
         Custom,
 
         /// <summary>
-        /// Legacy ioBroker-Adapter, läuft isoliert als Node.js-Prozess,
-        /// angebunden über die TCP-Bridge.
+        /// Legacy ioBroker-Adapter, lï¿½uft isoliert als Node.js-Prozess,
+        /// angebunden ï¿½ber die TCP-Bridge.
         /// </summary>
         IoBroker
     }

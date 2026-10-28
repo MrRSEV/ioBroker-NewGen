@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 namespace ioBroker_NewGen.Core.Bridge
 {
     /// <summary>
-    /// Repräsentiert eine einzelne, verbundene Adapter-Sitzung der TCP-Bridge.
-    /// Kapselt den <see cref="TcpClient"/>, die zugehörige Adapter-ID (nach Handshake)
+    /// Reprï¿½sentiert eine einzelne, verbundene Adapter-Sitzung der TCP-Bridge.
+    /// Kapselt den <see cref="TcpClient"/>, die zugehï¿½rige Adapter-ID (nach Handshake)
     /// sowie eine einfache Sende-Serialisierung (ein Writer gleichzeitig pro Verbindung).
     /// </summary>
     public sealed class BridgeConnection : IAsyncDisposable
@@ -34,7 +34,7 @@ namespace ioBroker_NewGen.Core.Bridge
         }
 
         /// <summary>
-        /// Liest das nächste Envelope von der Verbindung (oder <c>null</c> bei Verbindungsende).
+        /// Liest das nï¿½chste Envelope von der Verbindung (oder <c>null</c> bei Verbindungsende).
         /// </summary>
         public Task<BridgeEnvelope?> ReadAsync(CancellationToken cancellationToken = default)
         {
@@ -65,7 +65,7 @@ namespace ioBroker_NewGen.Core.Bridge
             }
             catch
             {
-                // Verbindung ggf. bereits beendet – ignorieren.
+                // Verbindung ggf. bereits beendet ï¿½ ignorieren.
             }
 
             _client.Close();

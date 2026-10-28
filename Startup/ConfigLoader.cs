@@ -5,7 +5,7 @@ using System.Text.Json;
 namespace ioBroker_NewGen.Startup
 {
     /// <summary>
-    /// L�dt die TOML-Konfiguration in das RSEV.Utilities-Konfigurationsregister.
+    /// L�dt die TOML-Konfiguration in das RSEV.Utilities-Konfigurationsregister.
     /// </summary>
     internal static class ConfigLoader
     {
@@ -22,6 +22,20 @@ namespace ioBroker_NewGen.Startup
             var section = string.Empty;
             var firstRunLineFound = false;
             var firstRunWasTrue = false;
+
+            // Defaults für Konfigurationen aus älteren Projektständen. Werte
+            // aus der Datei überschreiben diese Defaults beim anschließenden Parse.
+            rtx.Config.Set("admin.adminEnabled", true);
+            rtx.Config.Set("admin.adminPort", 8080);
+            rtx.Config.Set("admin.adminRequireAuthentication", true);
+            rtx.Config.Set("admin.adminToken", string.Empty);
+            rtx.Config.Set("adapter.customAdapterDirectory", "Adapters/custom");
+            rtx.Config.Set("adapter.adapterRootPath", "Adapters");
+            rtx.Config.Set("adapter.enabledAdapters", new[] { "admin" });
+            rtx.Config.Set("adapter.requireSignedPackages", false);
+            rtx.Config.Set("adapter.trustedPackagePublicKeyPem", string.Empty);
+            rtx.Config.Set("adapter.legacyAutoStart", false);
+            rtx.Config.Set("adapter.adapterAutoStart", true);
 
             foreach (var sourceLine in lines)
             {

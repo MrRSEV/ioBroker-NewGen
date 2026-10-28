@@ -3,25 +3,25 @@ using System.Collections.Generic;
 namespace ioBroker_NewGen.Core.Matrix
 {
     /// <summary>
-    /// Semantischer Index für Embeddings. Ermöglicht k-nächste-Nachbarn
-    /// Suche über alle registrierten States der <see cref="SemanticStateMatrix"/>.
+    /// Semantischer Index fï¿½r Embeddings. Ermï¿½glicht k-nï¿½chste-Nachbarn
+    /// Suche ï¿½ber alle registrierten States der <see cref="SemanticStateMatrix"/>.
     /// </summary>
     public interface IVectorIndex
     {
         /// <summary>
-        /// Fügt (oder aktualisiert) den Embedding-Eintrag für die übergebene ID.
+        /// Fï¿½gt (oder aktualisiert) den Embedding-Eintrag fï¿½r die ï¿½bergebene ID.
         /// </summary>
         void Add(string id, float[] embedding);
 
         /// <summary>
-        /// Entfernt den Embedding-Eintrag für die übergebene ID.
+        /// Entfernt den Embedding-Eintrag fï¿½r die ï¿½bergebene ID.
         /// </summary>
         void Remove(string id);
 
         /// <summary>
-        /// Führt eine k-nächste-Nachbarn Suche nach dem übergebenen Embedding durch.
+        /// Fï¿½hrt eine k-nï¿½chste-Nachbarn Suche nach dem ï¿½bergebenen Embedding durch.
         /// </summary>
-        /// <returns>Liste von (Id, Score) sortiert nach absteigender Ähnlichkeit.</returns>
+        /// <returns>Liste von (Id, Score) sortiert nach absteigender ï¿½hnlichkeit.</returns>
         IReadOnlyList<(string Id, float Score)> Search(float[] queryEmbedding, int k);
     }
 }

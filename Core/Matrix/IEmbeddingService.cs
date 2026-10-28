@@ -2,7 +2,7 @@ namespace ioBroker_NewGen.Core.Matrix
 {
     /// <summary>
     /// Erzeugt semantische Embeddings aus Text oder Payloads.
-    /// Implementierungen können später durch echte ML-Modelle
+    /// Implementierungen kï¿½nnen spï¿½ter durch echte ML-Modelle
     /// (z. B. ONNX, Sentence-Transformers) ersetzt werden.
     /// </summary>
     public interface IEmbeddingService
@@ -13,7 +13,7 @@ namespace ioBroker_NewGen.Core.Matrix
         int Dimensions { get; }
 
         /// <summary>
-        /// Erzeugt einen Embedding-Vektor für den übergebenen Text.
+        /// Erzeugt einen Embedding-Vektor fï¿½r den ï¿½bergebenen Text.
         /// </summary>
         float[] Encode(string text);
     }

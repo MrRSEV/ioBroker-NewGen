@@ -3,8 +3,12 @@
 ===== Speicherort =====
 
 ''config.toml'' liegt im Anwendungsverzeichnis (''AppContext.BaseDirectory'',
-also neben der ausführbaren Datei). Zuständig: ''Startup/ConfigCreator.cs''
+also neben der ausfï¿½hrbaren Datei). Zustï¿½ndig: ''Startup/ConfigCreator.cs''
 (''ConfigCreator.ConfigPath'').
+
+Die persistente Rollen- und Benutzerberechtigung liegt optional als
+''roles.json'' im selben Anwendungsverzeichnis und wird zusammen mit
+''config.toml'' und ''snapshot.jsonl'' in Backups aufgenommen.
 
 ===== Standard-Inhalt (wird beim Erststart automatisch erzeugt) =====
 
@@ -22,6 +26,12 @@ runtimeMode = "standalone"
 
 [adapter]
 adapterDirectory = "/var/newgen/adapters"
+customAdapterDirectory = "Adapters/custom"
+adapterRootPath = "Adapters"
+enabledAdapters = ["admin"]
+requireSignedPackages = false
+trustedPackagePublicKeyPem = ""
+legacyAutoStart = false
 adapterAutoStart = true
 adapterIsolationMode = "process"
 adapterSandboxing = true
@@ -49,6 +59,44 @@ busMaxFrameSize = 65536
 busRetryIntervalMs = 200
 busMaxSubscribers = 128
 
+[admin]
+adminEnabled = true
+adminPort = 8080
+adminRequireAuthentication = true
+adminToken = ""
+
+[mqtt]
+host = "127.0.0.1"
+port = 1883
+clientId = "newgen-mqtt"
+username = ""
+password = ""
+useTls = false
+keepAliveSeconds = 30
+topicFilter = "#"
+addressPrefix = "mqtt"
+
+[zigbee]
+host = "127.0.0.1"
+port = 1883
+clientId = "newgen-zigbee"
+username = ""
+password = ""
+useTls = false
+keepAliveSeconds = 30
+topicFilter = "zigbee2mqtt/#"
+baseTopic = "zigbee2mqtt"
+
+[hue]
+bridgeUri = "http://127.0.0.1"
+apiKey = ""
+pollIntervalMs = 10000
+
+[shelly]
+deviceUri = "http://127.0.0.1"
+switchId = 0
+pollIntervalMs = 5000
+
 [logging]
 logLevel = "info"
 logPath = "/var/newgen/logs"
@@ -68,10 +116,15 @@ sandboxNetworkPolicy = "local-only"
 </code>
 
 **Hinweis:** ''statePersistenceMode = "sqlite"'' sowie ''stateFilePath'' sind
-aktuell nur Konfigurationswerte – die tatsächliche State-Persistenz läuft
-(Stand Sprint 1) über die JSONL-Snapshot-Datei der ''SemanticStateMatrix''
-(siehe [[core-matrix]]), nicht über SQLite. Eine spätere Umsetzung ist möglich,
+aktuell nur Konfigurationswerte ï¿½ die tatsï¿½chliche State-Persistenz lï¿½uft
+(Stand Sprint 1) ï¿½ber die JSONL-Snapshot-Datei der ''SemanticStateMatrix''
+(siehe [[core-matrix]]), nicht ï¿½ber SQLite. Eine spï¿½tere Umsetzung ist mï¿½glich,
 aber noch nicht erfolgt.
+
+Bei aktiviertem ''adminRequireAuthentication'' erzeugt die AdminUI beim ersten
+Start ein zufÃ¤lliges Token, falls ''adminToken'' leer ist, und schreibt es in
+den Systemlog. API-Aufrufe verwenden entweder ''X-Admin-Token'' oder
+''Authorization: Bearer <token>''.
 
 ===== Laden & Registrierung (ConfigLoader) =====
 
@@ -88,9 +141,9 @@ aber noch nicht erfolgt.
 
 **Erststart-Erkennung:**
   * ''node.firstrun'' wird beim Laden ausgewertet
-  * Nach dem Laden wird ''node.firstrun'' **immer** auf ''false'' gesetzt –
+  * Nach dem Laden wird ''node.firstrun'' **immer** auf ''false'' gesetzt ï¿½
     sowohl im Config-Register als auch persistent in der Datei selbst
-  * Zusätzlich wird ''rtx.Set("HasRunBefore", true)'' im GlobalState gesetzt
+  * Zusï¿½tzlich wird ''rtx.Set("HasRunBefore", true)'' im GlobalState gesetzt
 
 **Zugriff aus Code:**
 
@@ -103,10 +156,10 @@ var port   = rtx.Config.Get<int>("ipc.ipcPort");
 
   - ''ConfigCreator.CreateDefaultConfigAsync(rtx)'' wird in ''FirstRun'' aufgerufen
   - Erstellt die Datei nur, falls sie noch nicht existiert
-  - Ruft **in jedem Fall** anschließend ''ConfigLoader.LoadIfExistsAsync(rtx)''
+  - Ruft **in jedem Fall** anschlieï¿½end ''ConfigLoader.LoadIfExistsAsync(rtx)''
     auf, sodass die (neue oder bereits vorhandene) Konfiguration sofort im
-    RSEV.Utilities-Register verfügbar ist
-  - Beim regulären Systemstart (''OnStart'') wird zusätzlich erneut
+    RSEV.Utilities-Register verfï¿½gbar ist
+  - Beim regulï¿½ren Systemstart (''OnStart'') wird zusï¿½tzlich erneut
     ''ConfigLoader.LoadIfExistsAsync(rtx)'' aufgerufen, um sicherzustellen,
-    dass auch bei nachträglichen manuellen Änderungen an der Datei die
+    dass auch bei nachtrï¿½glichen manuellen ï¿½nderungen an der Datei die
     aktuellen Werte geladen werden

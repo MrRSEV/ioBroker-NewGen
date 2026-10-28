@@ -1,0 +1,403 @@
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
+using ioBroker_NewGen.Core.Bus;
+using ioBroker_NewGen.Core.Matrix;
+using ioBroker_NewGen.Core.Registry;
+using ioBroker_NewGen.Core.Routing;
+using ioBroker_NewGen.Core.Deployment;
+using RSEV.Utilities.Loading;
+using RSEV.Utilities.Configuration;
+using RSEV.Utilities.Runtime;
+using RSEV.Utilities.Logging;
+
+namespace ioBroker_NewGen.Core.Adapters
+{
+    /// <summary>
+    /// Lädt und verwaltet host-interne C#-Adapter über die RSEV.Utilities-
+    /// AssemblyLoader-Infrastruktur.
+    /// </summary>
+    public sealed class CustomAdapterRuntime : IAsyncDisposable
+    {
+        private readonly AssemblyLoader _assemblyLoader;
+        private readonly AdapterRegistry _adapterRegistry;
+        private readonly IAdapterContext _adapterContext;
+        private readonly ILogger _logger;
+        private readonly ConcurrentDictionary<string, IAdapter> _adapters = new();
+        private readonly object _subscriptionLock = new();
+        private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
+        private readonly Action<BusFrame> _dispatchHandler;
+        private bool _subscribed;
+        private int _disposed;
+
+        public CustomAdapterRuntime(
+            AssemblyLoader assemblyLoader,
+            SemanticStateMatrix matrix,
+            SystemMessageBus systemBus,
+            AdapterRouter router,
+            AdapterRegistry adapterRegistry,
+            ILogger logger,
+            IRuntimeContext runtimeContext,
+            AdapterInstaller? adapterInstaller = null,
+            AdapterPackageInstaller? adapterPackageInstaller = null,
+            AdapterRepositoryClient? adapterRepositoryClient = null)
+        {
+            _assemblyLoader = assemblyLoader ?? throw new ArgumentNullException(nameof(assemblyLoader));
+            _adapterRegistry = adapterRegistry ?? throw new ArgumentNullException(nameof(adapterRegistry));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _adapterContext = new CustomAdapterContext(
+                matrix,
+                systemBus,
+                router,
+                adapterRegistry,
+                runtimeContext,
+                this,
+                adapterInstaller,
+                adapterPackageInstaller,
+                adapterRepositoryClient);
+
+            _dispatchHandler = DispatchCommandFrame;
+            systemBus.Subscribe("*", _dispatchHandler);
+            _subscribed = true;
+        }
+
+        public IReadOnlyCollection<IAdapter> Adapters => _adapters.Values.ToList();
+
+        /// <summary>
+        /// Lädt alle Assemblies eines Verzeichnisses und erzeugt darin gefundene
+        /// IAdapter-Implementierungen über parameterlose Konstruktoren.
+        /// </summary>
+        public IReadOnlyCollection<IAdapter> LoadAdapters(string directory)
+        {
+            if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
+            {
+                _logger.LogWarning($"[CustomAdapter] Verzeichnis nicht gefunden: '{directory}'.");
+                return Array.Empty<IAdapter>();
+            }
+
+            var assemblies = _assemblyLoader.LoadAssembliesFromDirectory(directory);
+            var loaded = new List<IAdapter>();
+
+            foreach (var assembly in assemblies)
+            {
+                foreach (var type in _assemblyLoader.FindTypesImplementing<IAdapter>(assembly))
+                {
+                    if (type.IsAbstract || type.IsInterface)
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        var adapter = _assemblyLoader.CreateInstance<IAdapter>(type);
+                        Register(adapter);
+                        loaded.Add(adapter);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError($"[CustomAdapter] Laden von '{type.FullName}' fehlgeschlagen: {ex.Message}");
+                    }
+                }
+            }
+
+            return loaded;
+        }
+
+        public AdapterRegistration Register(IAdapter adapter)
+        {
+            ArgumentNullException.ThrowIfNull(adapter);
+
+            if (adapter.Type != AdapterType.Custom)
+            {
+                throw new InvalidOperationException($"Adapter '{adapter.Name}' muss den Typ Custom besitzen.");
+            }
+
+            var registration = _adapterRegistry.Register(adapter.Name, AdapterType.Custom);
+            adapter.Id = registration.Id;
+            registration.InstanceReference = adapter;
+            var dependencies = adapter.Dependencies ?? Array.Empty<string>();
+            if (dependencies.Count > 0)
+            {
+                registration.Metadata["dependencies"] = string.Join(",", dependencies);
+            }
+            _adapters[registration.Id] = adapter;
+            return registration;
+        }
+
+        public async Task<bool> StartAdapterAsync(string adapterId, CancellationToken cancellationToken = default)
+        {
+            await _lifecycleGate.WaitAsync(cancellationToken);
+            try
+            {
+                return await StartAdapterCoreAsync(adapterId, cancellationToken);
+            }
+            finally
+            {
+                _lifecycleGate.Release();
+            }
+        }
+
+        private async Task<bool> StartAdapterCoreAsync(string adapterId, CancellationToken cancellationToken)
+        {
+            var resolvedId = ResolveAdapterId(adapterId);
+            return resolvedId is not null &&
+                   await StartAdapterWithDependenciesAsync(resolvedId, new HashSet<string>(StringComparer.Ordinal), cancellationToken);
+        }
+
+        private string? ResolveAdapterId(string adapterReference)
+        {
+            if (string.IsNullOrWhiteSpace(adapterReference))
+            {
+                return null;
+            }
+
+            if (_adapters.ContainsKey(adapterReference) && _adapterRegistry.Get(adapterReference) is not null)
+            {
+                return adapterReference;
+            }
+
+            return _adapters.Values
+                .Select(candidate => _adapterRegistry.Get(candidate.Id))
+                .Where(candidate => candidate is not null)
+                .OrderBy(candidate => candidate!.Id, StringComparer.Ordinal)
+                .FirstOrDefault(candidate =>
+                    string.Equals(candidate!.Name, adapterReference, StringComparison.OrdinalIgnoreCase))?.Id;
+        }
+
+        private async Task<bool> StartAdapterWithDependenciesAsync(
+            string adapterId,
+            HashSet<string> visiting,
+            CancellationToken cancellationToken)
+        {
+            if (!_adapters.TryGetValue(adapterId, out var adapter) || _adapterRegistry.Get(adapterId) is not { } registration)
+            {
+                return false;
+            }
+
+            if (registration.Status == AdapterStatus.Connected)
+            {
+                return true;
+            }
+
+            if (!visiting.Add(adapterId))
+            {
+                _adapterRegistry.UpdateStatus(adapterId, AdapterStatus.Faulted);
+                _logger.LogError($"[CustomAdapter] Abhängigkeitsschleife bei '{adapterId}'.");
+                return false;
+            }
+
+            foreach (var dependency in adapter.Dependencies ?? Array.Empty<string>())
+            {
+                var dependencyId = ResolveAdapterId(dependency);
+                if (dependencyId is null ||
+                    !await StartAdapterWithDependenciesAsync(dependencyId, visiting, cancellationToken))
+                {
+                    _adapterRegistry.UpdateStatus(adapterId, AdapterStatus.Faulted);
+                    _logger.LogError($"[CustomAdapter] Abhängigkeit '{dependency}' für '{adapterId}' konnte nicht gestartet werden.");
+                    visiting.Remove(adapterId);
+                    return false;
+                }
+            }
+
+            _adapterRegistry.UpdateStatus(adapterId, AdapterStatus.Connecting);
+            try
+            {
+                await adapter.InitializeAsync(_adapterContext, cancellationToken);
+                await adapter.StartAsync(cancellationToken);
+                _adapterRegistry.UpdateStatus(adapterId, AdapterStatus.Connected);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _adapterRegistry.UpdateStatus(adapterId, AdapterStatus.Faulted);
+                _logger.LogError($"[CustomAdapter] Start von '{adapterId}' fehlgeschlagen: {ex}");
+                visiting.Remove(adapterId);
+                return false;
+            }
+            finally
+            {
+                visiting.Remove(adapterId);
+            }
+        }
+
+        public async Task<int> StartAllAsync(CancellationToken cancellationToken = default)
+        {
+            await _lifecycleGate.WaitAsync(cancellationToken);
+            try
+            {
+                var started = 0;
+                var configuredAdapters = ReadEnabledAdapterReferences();
+                var adapterIds = configuredAdapters is null
+                    ? _adapters.Keys.OrderBy(id => id, StringComparer.Ordinal).ToArray()
+                    : configuredAdapters
+                        .Select(ResolveAdapterId)
+                        .Where(id => id is not null)
+                        .Cast<string>()
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .OrderBy(id => id, StringComparer.Ordinal)
+                        .ToArray();
+
+                foreach (var adapterId in adapterIds)
+                {
+                    if (await StartAdapterWithDependenciesAsync(
+                            adapterId,
+                            new HashSet<string>(StringComparer.Ordinal),
+                            cancellationToken))
+                    {
+                        started++;
+                    }
+                }
+
+                return started;
+            }
+            finally
+            {
+                _lifecycleGate.Release();
+            }
+        }
+
+        private IReadOnlyCollection<string>? ReadEnabledAdapterReferences()
+        {
+            try
+            {
+                var configured = _adapterContext.Config.Get<string[]>("adapter.enabledAdapters");
+                return configured is null
+                    ? Array.Empty<string>()
+                    : configured.Where(reference => !string.IsNullOrWhiteSpace(reference)).ToArray();
+            }
+            catch
+            {
+                // Kein Aktivierungsfilter in älteren Konfigurationen: aus
+                // Kompatibilitätsgründen werden dann alle geladenen Adapter gestartet.
+                return null;
+            }
+        }
+
+        public async Task<bool> StopAdapterAsync(string adapterId, CancellationToken cancellationToken = default)
+        {
+            await _lifecycleGate.WaitAsync(cancellationToken);
+            try
+            {
+                return await StopAdapterCoreAsync(adapterId, cancellationToken);
+            }
+            finally
+            {
+                _lifecycleGate.Release();
+            }
+        }
+
+        private async Task<bool> StopAdapterCoreAsync(string adapterId, CancellationToken cancellationToken)
+        {
+            var resolvedId = ResolveAdapterId(adapterId);
+            if (resolvedId is null || !_adapters.TryGetValue(resolvedId, out var adapter))
+            {
+                return false;
+            }
+
+            try
+            {
+                await adapter.StopAsync(cancellationToken);
+                _adapterRegistry.UpdateStatus(resolvedId, AdapterStatus.Disconnected);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _adapterRegistry.UpdateStatus(resolvedId, AdapterStatus.Faulted);
+                _logger.LogError($"[CustomAdapter] Stop von '{resolvedId}' fehlgeschlagen: {ex}");
+                return false;
+            }
+        }
+
+        public async Task StopAllAsync(CancellationToken cancellationToken = default)
+        {
+            await _lifecycleGate.WaitAsync(cancellationToken);
+            try
+            {
+                var stopped = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var adapterId in _adapters.Keys.OrderBy(id => id, StringComparer.Ordinal).ToList())
+                {
+                    await StopAdapterWithDependentsAsync(adapterId, stopped, cancellationToken);
+                }
+            }
+            finally
+            {
+                _lifecycleGate.Release();
+            }
+        }
+
+        private async Task StopAdapterWithDependentsAsync(
+            string adapterId,
+            HashSet<string> stopped,
+            CancellationToken cancellationToken)
+        {
+            if (!stopped.Add(adapterId))
+            {
+                return;
+            }
+
+            var dependents = _adapters.Values
+                .Where(candidate => candidate.Id != adapterId)
+                .Where(candidate => (candidate.Dependencies ?? Array.Empty<string>())
+                    .Any(dependency => string.Equals(ResolveAdapterId(dependency), adapterId, StringComparison.OrdinalIgnoreCase)))
+                .Select(candidate => candidate.Id)
+                .OrderBy(id => id, StringComparer.Ordinal)
+                .ToArray();
+
+            foreach (var dependentId in dependents)
+            {
+                await StopAdapterWithDependentsAsync(dependentId, stopped, cancellationToken);
+            }
+
+            await StopAdapterCoreAsync(adapterId, cancellationToken);
+        }
+
+        private void DispatchCommandFrame(BusFrame frame)
+        {
+            if (frame.Kind != BusFrameKind.Command || !_adapters.TryGetValue(frame.AdapterId, out var adapter))
+            {
+                return;
+            }
+
+            try
+            {
+                adapter.ReceivePayload(frame);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"[CustomAdapter] Empfang bei '{frame.AdapterId}' fehlgeschlagen: {ex}");
+                _adapterRegistry.UpdateStatus(frame.AdapterId, AdapterStatus.Faulted);
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            {
+                return;
+            }
+
+            try
+            {
+                await StopAllAsync();
+            }
+            finally
+            {
+                if (_subscribed)
+                {
+                    lock (_subscriptionLock)
+                    {
+                        _adapterContext.SystemBus.Unsubscribe("*", _dispatchHandler);
+                        _subscribed = false;
+                    }
+                }
+
+                _lifecycleGate.Dispose();
+            }
+        }
+    }
+}

@@ -6,9 +6,11 @@
     <RootNamespace>ioBroker_NewGen</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Version>0.2.0</Version>
-    <AssemblyVersion>0.2.0.0</AssemblyVersion>
-    <FileVersion>0.2.0.0</FileVersion>
+    <Version>0.3.0-beta0</Version>
+    <AssemblyVersion>0.3.0.0</AssemblyVersion>
+    <FileVersion>0.3.0.0</FileVersion>
+    <InformationalVersion>beta0.3.0</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,5 +19,42 @@
       <Private>true</Private>
     </Reference>
   </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="tests\**\*.cs" />
+    <Compile Remove="Adapters\**\*.cs" />
+    <None Remove="tests\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ExternalAdapterProject Include="Adapters\**\*.csproj" />
+  </ItemGroup>
+
+  <Target Name="BuildExternalAdapterAssembliesForPublish" BeforeTargets="Publish">
+    <MSBuild Projects="@(ExternalAdapterProject)"
+             Targets="Build"
+             BuildInParallel="true"
+             Properties="Configuration=$(Configuration);TargetFramework=$(TargetFramework)" />
+  </Target>
+
+  <Target Name="CopyExternalAdapterAssembliesForPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <ExternalAdapterAssembly Include="$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\Adapters\custom\*.dll" />
+    </ItemGroup>
+    <MakeDir Directories="$(PublishDir)Adapters\custom" />
+    <Copy SourceFiles="@(ExternalAdapterAssembly)"
+          DestinationFolder="$(PublishDir)Adapters\custom"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyRuntimeArtifactsForPublish" AfterTargets="Publish">
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\Doku\config.template.toml"
+          DestinationFiles="$(PublishDir)config.toml"
+          SkipUnchangedFiles="true" />
+    <WriteLinesToFile File="$(PublishDir)snapshot.jsonl"
+                      Lines=""
+                      Overwrite="true"
+                      Encoding="UTF-8" />
+  </Target>
 
 </Project>

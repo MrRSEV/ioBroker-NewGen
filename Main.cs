@@ -1,4 +1,4 @@
-﻿using ioBroker_NewGen.Controllers;
+using ioBroker_NewGen.Controllers;
 using ioBroker_NewGen.Runtime;
 using ioBroker_NewGen.Startup;
 

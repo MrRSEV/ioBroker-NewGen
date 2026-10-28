@@ -5,10 +5,10 @@ using System.Text;
 namespace ioBroker_NewGen.Core.Matrix
 {
     /// <summary>
-    /// Deterministische, abhängigkeitsfreie Embedding-Implementierung auf
-    /// Basis von Hashing (Feature Hashing / "Hashing Trick"). Erzeugt für
+    /// Deterministische, abhï¿½ngigkeitsfreie Embedding-Implementierung auf
+    /// Basis von Hashing (Feature Hashing / "Hashing Trick"). Erzeugt fï¿½r
     /// identischen Text immer denselben, L2-normierten Vektor. Dient als
-    /// voll funktionsfähiger Platzhalter, bis ein echtes ML-Modell integriert wird.
+    /// voll funktionsfï¿½higer Platzhalter, bis ein echtes ML-Modell integriert wird.
     /// </summary>
     public sealed class HashingEmbeddingService : IEmbeddingService
     {
@@ -18,7 +18,7 @@ namespace ioBroker_NewGen.Core.Matrix
         {
             if (dimensions <= 0)
             {
-                throw new ArgumentOutOfRangeException(nameof(dimensions), "Dimensionen müssen größer als 0 sein.");
+                throw new ArgumentOutOfRangeException(nameof(dimensions), "Dimensionen mï¿½ssen grï¿½ï¿½er als 0 sein.");
             }
 
             Dimensions = dimensions;

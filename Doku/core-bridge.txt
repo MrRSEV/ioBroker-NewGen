@@ -1,10 +1,10 @@
-====== Core/Bridge – TCP-Bridge & Node.js-Adapter-Runtime ======
+====== Core/Bridge ï¿½ TCP-Bridge & Node.js-Adapter-Runtime ======
 
 Namespace: ''ioBroker_NewGen.Core.Bridge''
 
-Seit **Sprint 2** verfügt das System über eine funktionierende TCP-Bridge zur
+Seit **Sprint 2** verfï¿½gt das System ï¿½ber eine funktionierende TCP-Bridge zur
 Anbindung isolierter Legacy-ioBroker-Adapter (Node.js-Prozesse) sowie eine
-Node.js-Prozess-Runtime mit Crash-Recovery und Heartbeat-Überwachung.
+Node.js-Prozess-Runtime mit Crash-Recovery und Heartbeat-ï¿½berwachung.
 
 ===== Protokoll =====
 
@@ -14,7 +14,7 @@ Node.js-Prozess-Runtime mit Crash-Recovery und Heartbeat-Überwachung.
 public enum BridgeMessageType
 {
     Handshake,     // Adapter ? Host: Erstkontakt, sendet eigenen Namen
-    HandshakeAck,  // Host ? Adapter: bestätigt Handshake, teilt vergebene ID mit
+    HandshakeAck,  // Host ? Adapter: bestï¿½tigt Handshake, teilt vergebene ID mit
     Frame,         // bidirektional: transportiert ein BusFrame
     Heartbeat,     // bidirektional: Lebenszeichen
     Error          // bidirektional: Fehlermeldung
@@ -23,7 +23,7 @@ public enum BridgeMessageType
 
 ==== BridgeEnvelope ====
 
-Kompaktes JSON-Transport-Envelope (kein reines Binärprotokoll, aber kompakt):
+Kompaktes JSON-Transport-Envelope (kein reines Binï¿½rprotokoll, aber kompakt):
 
 ^ Feld            ^ Beschreibung ^
 | Type            | ''BridgeMessageType'' |
@@ -36,23 +36,23 @@ Kompaktes JSON-Transport-Envelope (kein reines Binärprotokoll, aber kompakt):
 | ErrorMessage    | Nur bei ''Error'' gesetzt |
 | Timestamp       | UTC-Zeitstempel |
 
-==== BridgeProtocol – Framing ====
+==== BridgeProtocol ï¿½ Framing ====
 
-Jede Nachricht wird mit einem **4-Byte-Big-Endian-Längenpräfix** gesendet,
+Jede Nachricht wird mit einem **4-Byte-Big-Endian-Lï¿½ngenprï¿½fix** gesendet,
 gefolgt von der UTF-8-kodierten JSON-Nutzlast. Dadurch sind Nachrichtengrenzen
-im TCP-Stream eindeutig erkennbar, unabhängig von TCP-Fragmentierung.
+im TCP-Stream eindeutig erkennbar, unabhï¿½ngig von TCP-Fragmentierung.
 
-  * ''BridgeProtocol.WriteAsync(stream, envelope)'' – serialisiert + schreibt mit Längenpräfix
-  * ''BridgeProtocol.ReadAsync(stream)'' – liest Längenpräfix, dann exakt so viele Bytes, deserialisiert
+  * ''BridgeProtocol.WriteAsync(stream, envelope)'' ï¿½ serialisiert + schreibt mit Lï¿½ngenprï¿½fix
+  * ''BridgeProtocol.ReadAsync(stream)'' ï¿½ liest Lï¿½ngenprï¿½fix, dann exakt so viele Bytes, deserialisiert
 
 ===== BridgeConnection =====
 
 Kapselt eine einzelne TCP-Verbindung (``TcpClient`` + ``NetworkStream``):
 
-  * ''AdapterId'' – gesetzt nach erfolgreichem Handshake
-  * ''LastSeenAt'' – Zeitpunkt des letzten empfangenen Envelopes
-  * ''ReadAsync'' / ''SendAsync'' (Schreibzugriffe werden über ein ''SemaphoreSlim''
-    serialisiert, um parallele Schreibvorgänge auf demselben Stream zu verhindern)
+  * ''AdapterId'' ï¿½ gesetzt nach erfolgreichem Handshake
+  * ''LastSeenAt'' ï¿½ Zeitpunkt des letzten empfangenen Envelopes
+  * ''ReadAsync'' / ''SendAsync'' (Schreibzugriffe werden ï¿½ber ein ''SemaphoreSlim''
+    serialisiert, um parallele Schreibvorgï¿½nge auf demselben Stream zu verhindern)
 
 ===== TcpBridgeServer =====
 
@@ -61,17 +61,17 @@ aus ''config.toml'', Fallback 5001).
 
 **Handshake-Ablauf:**
   - Adapter verbindet sich per TCP
-  - Adapter sendet ''BridgeMessageType.Handshake'' mit seinem Namen (''AdapterId''-Feld enthält den Namen, z. B. "mqtt")
+  - Adapter sendet ''BridgeMessageType.Handshake'' mit seinem Namen (''AdapterId''-Feld enthï¿½lt den Namen, z. B. "mqtt")
   - Host registriert den Adapter in der ''AdapterRegistry'' (Typ ''AdapterType.IoBroker'') und vergibt
     eine eindeutige ID im Format **"Name.id"** (z. B. "mqtt.0", "mqtt.1", ...)
-  - Host sendet ''BridgeMessageType.HandshakeAck'' mit der vergebenen ID zurück
+  - Host sendet ''BridgeMessageType.HandshakeAck'' mit der vergebenen ID zurï¿½ck
   - Ab sofort werden ''Frame''- und ''Heartbeat''-Nachrichten bidirektional ausgetauscht
 
 **Eingehende Frames** (Adapter ? Host): Werden 1:1 auf den ''SystemMessageBus''
 gespiegelt (''HandleIncomingFrame'' ? ''SystemMessageBus.Publish'').
 
 **Ausgehende Frames** (Host ? Adapter): ''SendToAdapterAsync(adapterId, frame)''
-sucht die passende ''BridgeConnection'' über die Adapter-ID und sendet das Frame
+sucht die passende ''BridgeConnection'' ï¿½ber die Adapter-ID und sendet das Frame
 als ''BridgeMessageType.Frame''-Envelope.
 
 Bei Verbindungsabbruch wird der Adapterstatus in der ''AdapterRegistry'' auf
@@ -79,27 +79,27 @@ Bei Verbindungsabbruch wird der Adapterstatus in der ''AdapterRegistry'' auf
 
 ===== NodeAdapterRuntime =====
 
-Verwaltet isolierte Node.js-Prozesse für Legacy-ioBroker-Adapter, basierend auf
+Verwaltet isolierte Node.js-Prozesse fï¿½r Legacy-ioBroker-Adapter, basierend auf
 den dekompilierten RSEV.Utilities-Prozessklassen:
 
-  * ''RSEV.Utilities.Processes.NodeProcess'' – startet ''node <script> <args>'' als Subprozess,
+  * ''RSEV.Utilities.Processes.NodeProcess'' ï¿½ startet ''node <script> <args>'' als Subprozess,
     leitet stdout/stderr um, klassifiziert Log-Zeilen (Error/Warning/Info)
-  * ''RSEV.Utilities.Processes.RuntimeProcessController'' – zentrale Prozessverwaltung
-    (Register, Start/Stop/Restart, Health-Checks, Auflistung) – bereits über
-    ''IRuntimeContext.ProcessController'' im ''MainRuntimeContext'' verfügbar
+  * ''RSEV.Utilities.Processes.RuntimeProcessController'' ï¿½ zentrale Prozessverwaltung
+    (Register, Start/Stop/Restart, Health-Checks, Auflistung) ï¿½ bereits ï¿½ber
+    ''IRuntimeContext.ProcessController'' im ''MainRuntimeContext'' verfï¿½gbar
 
 **API von NodeAdapterRuntime:**
 
 ^ Methode                                                               ^ Beschreibung ^
-| ''StartAdapterAsync(name, scriptPath, arguments?)''                   | Registriert Adapter in ''AdapterRegistry'' (Typ IoBroker), startet ''NodeProcess'' über ''RuntimeProcessController'' |
-| ''StopAdapterAsync(adapterId)''                                      | Stoppt den zugehörigen Node-Prozess, Status ? Disconnected |
+| ''StartAdapterAsync(name, scriptPath, arguments?)''                   | Registriert Adapter in ''AdapterRegistry'' (Typ IoBroker), startet ''NodeProcess'' ï¿½ber ''RuntimeProcessController'' |
+| ''StopAdapterAsync(adapterId)''                                      | Stoppt den zugehï¿½rigen Node-Prozess, Status ? Disconnected |
 | ''StartHealthMonitoring()'' / ''StopHealthMonitoring()''             | Periodischer Timer (Default 5000 ms, aus ''adapterHealthCheckIntervalMs'') |
 | ''StopAllAsync()''                                                   | Stoppt alle verwalteten Prozesse (z. B. bei Systemstopp) |
 
-**Crash-Recovery:** Der Health-Timer ruft für jeden verwalteten Prozess
-''CheckHealthAsync()'' auf. Liefert dieser ''false'' (Prozess beendet/abgestürzt),
+**Crash-Recovery:** Der Health-Timer ruft fï¿½r jeden verwalteten Prozess
+''CheckHealthAsync()'' auf. Liefert dieser ''false'' (Prozess beendet/abgestï¿½rzt),
 wird der Adapterstatus auf ''Faulted'' gesetzt, nach ''adapterCrashRestartDelayMs''
-(Default 2000 ms) ein ''RestartAsync()'' ausgeführt und der Status entsprechend
+(Default 2000 ms) ein ''RestartAsync()'' ausgefï¿½hrt und der Status entsprechend
 auf ''Connected'' oder erneut ''Faulted'' aktualisiert.
 
 ===== Integration in MainRuntimeContext =====
@@ -108,19 +108,19 @@ auf ''Connected'' oder erneut ''Faulted'' aktualisiert.
 | ''AdapterRegistry''                        | Zentrale Registry aller Adapter (Custom + IoBroker) |
 | ''TcpBridge''                               | Die laufende ''TcpBridgeServer''-Instanz (oder ''null'' vor Start) |
 | ''NodeRuntime''                             | Die ''NodeAdapterRuntime''-Instanz (oder ''null'' vor Initialisierung) |
-| ''StartTcpBridgeAsync(port)''               | Erstellt + startet die TCP-Bridge, verknüpft sie mit dem ''AdapterRouter'' |
-| ''InitializeNodeRuntime()''                 | Erstellt die ''NodeAdapterRuntime'' (nutzt ''ProcessController'' aus RSEV.Utilities) und startet die Health-Überwachung |
+| ''StartTcpBridgeAsync(port)''               | Erstellt + startet die TCP-Bridge, verknï¿½pft sie mit dem ''AdapterRouter'' |
+| ''InitializeNodeRuntime()''                 | Erstellt die ''NodeAdapterRuntime'' (nutzt ''ProcessController'' aus RSEV.Utilities) und startet die Health-ï¿½berwachung |
 | ''ShutdownBridgeAndNodeRuntimeAsync()''     | Stoppt Node-Runtime und TCP-Bridge geordnet (aufgerufen in ''OnStop'') |
 
 ===== Ablauf beim Systemstart (OnStart) =====
 
-  - ''InitializeMatrixAndBus(snapshotPath)'' – wie Sprint 1
+  - ''InitializeMatrixAndBus(snapshotPath)'' ï¿½ wie Sprint 1
   - Port aus ''rtx.Config.Get<int>("ipc.ipcPort")'' lesen (Fallback 5001)
-  - ''StartTcpBridgeAsync(port)'' – TCP-Bridge starten, mit ''AdapterRouter'' verknüpfen
-  - ''InitializeNodeRuntime()'' – Node-Runtime erzeugen, Health-Monitoring starten
+  - ''StartTcpBridgeAsync(port)'' ï¿½ TCP-Bridge starten, mit ''AdapterRouter'' verknï¿½pfen
+  - ''InitializeNodeRuntime()'' ï¿½ Node-Runtime erzeugen, Health-Monitoring starten
 
 ===== Ablauf beim Systemstopp (OnStop) =====
 
-  - ''ShutdownBridgeAndNodeRuntimeAsync()'' – stoppt zuerst alle Node-Prozesse,
+  - ''ShutdownBridgeAndNodeRuntimeAsync()'' ï¿½ stoppt zuerst alle Node-Prozesse,
     danach die TCP-Bridge (inkl. aller offenen Verbindungen)
-  - anschließend wie gewohnt: Snapshot der ''SemanticStateMatrix'' schreiben
+  - anschlieï¿½end wie gewohnt: Snapshot der ''SemanticStateMatrix'' schreiben

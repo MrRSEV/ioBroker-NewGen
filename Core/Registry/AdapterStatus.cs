@@ -26,7 +26,7 @@ namespace ioBroker_NewGen.Core.Registry
         Disconnected,
 
         /// <summary>
-        /// Adapter ist abgestürzt oder in einen Fehlerzustand geraten.
+        /// Adapter ist abgestï¿½rzt oder in einen Fehlerzustand geraten.
         /// </summary>
         Faulted
     }

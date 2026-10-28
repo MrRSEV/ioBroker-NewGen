@@ -1,120 +1,139 @@
 ====== Sprintplan & Roadmap ======
 
-Hinweis: Der Sprintplan dient nur zur groben Orientierung. Die tatsächliche
-Umsetzung kann vom ursprünglichen Plan abweichen, insbesondere wenn sich im
-Projektverlauf ergibt, dass bestimmte Komponenten (z. B. die semantische
-Matrix mit Embeddings/Vektorindex) bereits früher vollständig umgesetzt werden,
-statt wie ursprünglich geplant erst in einem späteren Sprint.
+Dieser Plan ist die verbindliche Definition of Done fÃ¼r ioBroker-CSharp-Fork.
+SystemBus und EventBus stammen aus RSEV.Utilities 3.0.0; sie werden im Projekt
+nicht als eigene Infrastruktur neu implementiert.
 
-===== Sprint 1 – Core Fundament ? Abgeschlossen =====
+===== Sprint 1 â€“ Core Fundament =====
 
-**Geplante Ziele:**
-  * StateMatrix Grundstruktur in C#
-  * Thread-safety (ReaderWriterLockSlim)
-  * Typisierter Objektbaum
-  * SystemBus aus RSEV.Utilities integrieren
-  * AdapterRouter Skeleton
+**DoD:** StateMatrix hÃ¤lt Werte stabil, der RSEV-Systembus routet Payloads und
+der Router kann interne Frames weiterleiten.
 
-**Tatsächlich umgesetzt (erweitert gegenüber Plan):**
-  * ''SemanticStateMatrix'' – voll funktionsfähig inkl. Embeddings, semantischem
-    Vektorindex, Rollenprüfung und **vollständiger** JSONL-Snapshot-Persistenz
-    (nicht nur Grundstruktur, sondern bereits produktionsreif für Sprint 1)
-  * Thread-Safety über ''ConcurrentDictionary'' + interne Locks in ''StateNode''
-    (statt ''ReaderWriterLockSlim'', siehe [[core-matrix]])
-  * ''SystemMessageBus'' als eigene konkrete Implementierung von
-    ''RSEV.Utilities.Messaging.BaseMessageBus'' mit Publish/Subscribe für ''BusFrame''
-  * ''AdapterRouter''-Skeleton mit ''AdapterType.Custom''/''IoBroker''-Unterscheidung
-  * Zusätzlich (nicht ursprünglich für Sprint 1 geplant, aber im Zuge der
-    Grundlagenarbeit umgesetzt): Runtime-Lifecycle (FirstRun/OnStart/OnStop),
-    Logger-Initialisierung, vollständige Konfigurations-Pipeline (config.toml)
+**Stand:** Umgesetzt.
 
-Details siehe [[core-matrix]], [[core-bus]], [[core-routing]], [[runtime-lifecycle]], [[konfiguration]].
+  * StateMatrix mit State-CRUD, Thread-Safety, typisiertem Objektmodell,
+    Validierungsdefinitionen und deterministischer JSON-Ausgabe.
+  * Systembus als RSEV.Utilities-''BaseMessageBus'' mit RSEV-''EventRegistry''
+    fÃ¼r ''BusFrame''.
+  * AdapterRouter fÃ¼r Custom- und Legacy-Adapter.
 
-===== Sprint 2 – TCP-Bridge & Legacy Runtime ? Abgeschlossen =====
+===== Sprint 2 â€“ TCP-Bridge & Legacy Runtime =====
 
-**Geplante Ziele:**
-  * TCP-Bridge implementieren
-  * Node.js Adapter Runtime isoliert starten
-  * Handshake Name ? Host-ID
-  * AdapterRegistry Basis
+**DoD:** Node.js-Adapter verbindet sich, erhÃ¤lt eine ''Name.id''-ID und
+Payloads laufen Ã¼ber Systembus in die StateMatrix.
 
-**Tatsächlich umgesetzt:**
-  * ''Core/Bridge'' – vollständiges TCP-Bridge-Protokoll:
-    * ''BridgeMessageType'' (Handshake, HandshakeAck, Frame, Heartbeat, Error)
-    * ''BridgeEnvelope'' – kompaktes JSON-Transport-Envelope
-    * ''BridgeProtocol'' – Framing mit 4-Byte-Längenpräfix über ''NetworkStream''
-    * ''BridgeConnection'' – kapselt eine einzelne TCP-Verbindung, serialisiert Schreibzugriffe
-    * ''TcpBridgeServer'' – Listener, Handshake-Verarbeitung, ID-Vergabe, bidirektionaler
-      Frame-Transport (eingehend ? 1:1 auf SystemBus gespiegelt; ausgehend ? gezielt an
-      Adapter-ID adressiert)
-  * ''Core/Bridge/NodeAdapterRuntime'' – isolierte Node.js-Prozesse auf Basis der
-    dekompilierten RSEV.Utilities-Prozessklassen (''NodeProcess'', ''RuntimeProcessController''):
-    * Start/Stop über ''RuntimeProcessController''
-    * Crash-Recovery: periodischer Health-Check (''CheckHealthAsync''), automatischer
-      ''RestartAsync()'' bei Ausfall, konfigurierbare Verzögerung
-    * Heartbeat/Health-Monitoring über internen Timer
-  * ''Core/Registry'' – ''AdapterRegistry'' Basis:
-    * ''AdapterRegistration'' (Name, Id, Type, Status, Metadata, TcpEndpoint, InstanceReference)
-    * ''AdapterStatus''-Enum (Created, Connecting, Connected, Disconnected, Faulted)
-    * Automatische ID-Vergabe im Format "Name.id" (z. B. "mqtt.0")
-  * ''AdapterRouter'' erweitert: ''AttachTcpBridge'' verknüpft den Router mit der laufenden
-    Bridge, sodass ''AdapterType.IoBroker''-Frames tatsächlich zugestellt werden (statt
-    nur geloggt wie im Sprint-1-Skeleton)
-  * ''MainRuntimeContext'' erweitert um ''AdapterRegistry'', ''TcpBridge'', ''NodeRuntime''
-    sowie die Methoden ''StartTcpBridgeAsync'', ''InitializeNodeRuntime'',
-    ''ShutdownBridgeAndNodeRuntimeAsync''
-  * ''OnStart''/''OnStop'' integrieren Bridge- und Node-Runtime-Lifecycle (Port aus
-    ''config.toml'' ? ''ipc.ipcPort'', Fallback 5001)
+**Stand:** Weitgehend umgesetzt; externe Legacy-Abnahme offen.
 
-Details siehe [[core-bridge]], [[core-registry]], [[core-routing]].
+  * TCP-Framing, Handshake, Registry, Prozessruntime und Crash-Recovery sind
+    vorhanden.
+  * StateUpdate-Frames werden Ã¼ber den Systembus in die Matrix gespiegelt.
+  * UnabhÃ¤ngiger Node.js-Client unter ''Legacy/NodeAdapterClient.js'' und
+    externer Node-Prozess-/Bridge-End-to-End-Smoke-Test sind vorhanden.
 
-===== Sprint 3 – CustomAdapter API ? Offen =====
+===== Sprint 3 â€“ CustomAdapter API =====
 
-  * ''IAdapter'' finalisieren (Name, Id, Type, SendPayload, ReceivePayload)
-  * CustomAdapter Runtime (Assembly Loading, Instanzreferenz)
-  * Lifecycle Management (Init, Start, Stop)
+**Stand:** Umgesetzt.
 
-===== Sprint 4 – StateEngine & EventBus ? Offen =====
+  * ''IAdapter'', ''IAdapterContext'' und ''DeviceAdapterBase''.
+  * Assembly-Erkennung und Instanziierung Ã¼ber RSEV.Utilities ''AssemblyLoader''.
+  * Init/Start/Stop, Registry-Referenz und interner Busversand.
 
-  * StateEngine Validierung (min, max, type, role, unit)
-  * Deterministischer Objektbaum (JSON-Repräsentation)
-  * EventBus aus RSEV.Utilities integrieren (Subscriptions, Adapter Events)
+===== Sprint 4 â€“ StateEngine & EventBus =====
 
-===== Sprint 5 – AdminUI ? Offen =====
+**Stand:** Umgesetzt mit Testabdeckung.
 
-  * Live-State-Ansicht, Objektbaum-Viewer
-  * Adapter-Management, Installation/Updates
-  * Logs, Konfiguration
+  * State-Validierung fÃ¼r Typ, Min, Max, Rolle und Einheit.
+  * Deterministische State-/Objektbaum-JSON-ReprÃ¤sentation.
+  * RSEV.Utilities ''BaseEventBus'' und ''EventRegistry<T>'' fÃ¼r State- und
+    Adapterereignisse.
 
-===== Sprint 6 – Installation & Deployment ? Offen =====
+===== Sprint 5 â€“ AdminUI =====
 
-  * Adapter-Ordnerstruktur (''/Adapters/IOBroker'', ''/Adapters/custom'')
-  * Legacy-Adapter-Installer (Original-Repositories)
-  * CustomAdapter-Deployment (C# Assembly Plugins)
+**Stand:** Umgesetzt.
 
-===== Sprint 7 – Migration Phase 1 ? Offen =====
+  * Externe ''AdminUI.dll'' als normaler CustomAdapter Ã¼ber RSEV.Utilities
+    ''RuntimeApiHost''.
+  * Live-State-Ansicht, AdapterÃ¼bersicht, Konfigurationsansicht und Start/Stop-
+    Endpunkte fÃ¼r CustomAdapter.
+  * Optionales Dependency-Modell in ''IAdapter''; Admin kann von anderen
+    Assemblies angefordert werden, unabhÃ¤ngige Adapter dÃ¼rfen eine leere Liste
+    verwenden.
+  * Token-/Bearer-Authentifizierung, Adapterinstallation, Logs und Start/Stop-
+    Verwaltung sind vorhanden.
+  * Persistente Benutzer-/Rollenrechte, Rollen-Zuweisung sowie die Admin-API-
+    Endpunkte ''/api/roles'' und ''/api/users'' sind vorhanden.
 
-Kritische Adapter: MQTT, Zigbee, Philips Hue, Shelly
+===== Sprint 6 â€“ Installation & Deployment =====
 
-===== Sprint 8 – Stabilisierung & Performance ? Offen =====
+**Stand:** Umgesetzt fÃ¼r lokale und signierte HTTP-Repository-Pakete.
 
-Memory Profiling, Thread-Optimierungen, BusFrame-/TCP-Bridge-Optimierung, Crash-Recovery
+  * AdapterInstaller fÃ¼r ''/Adapters/IOBroker'' und ''/Adapters/custom''.
+  * Lokale DLL- und Legacy-Verzeichnisinstallation, Layout und Runtime-Start.
+  * Adapterpaket-Manifest, SHA-256-PrÃ¼fung und Installations-API sind vorhanden.
+  * Repository-Index, ZIP-Download, SHA-256- und RSA-PrÃ¼fung mit konfiguriertem
+    Trust-Key sind vorhanden; die Signaturpflicht ist konfigurierbar.
 
-===== Sprint 9 – Migration Phase 2 ? Offen =====
+===== Sprint 7 â€“ Migration Phase 1 =====
 
-Mittlere Adapter: FRITZ!Box, Bosch, KNX, Modbus
+**Stand:** Native DLLs und lokale Protokoll-Fixtures vorhanden, reale GerÃ¤teintegration offen.
 
-===== Sprint 10 – Migration Phase 3 ? Offen =====
+  * MQTT: MQTT 3.1.1/TCP, QoS 0, mit lokalem Wire-Fixture.
+  * Zigbee: Zigbee2MQTT Ã¼ber MQTT, mit lokalem MQTT-Fixture.
+  * Philips Hue: lokale HTTP API v1, mit lokalem HTTP-Fixture.
+  * Shelly: Gen2 RPC/HTTP, mit lokalem HTTP-Fixture.
 
-Homematic, Alexa, weitere kleine Adapter
+FÃ¼r die vollstÃ¤ndige DoD fehlen reale GerÃ¤te-/Broker-Fixtures und StabilitÃ¤ts-
+tests gegen die Zielumgebungen.
 
-===== Sprint 11 – Finalisierung ? Offen =====
+===== Sprint 8 â€“ Stabilisierung & Performance =====
 
-Dokumentation, Developer Guide, Adapter SDK, Backup-System, Permissions, Release Candidate
+**Stand:** Teilweise umgesetzt; Basislast- und Protokoll-Smokes vorhanden.
 
-===== Priorisierte Adapter-Migration (Gesamtübersicht) =====
+  * Nicht Ã¼berlappende Health-Check-Zyklen.
+  * HTTP-Adapter bleiben bei einem temporÃ¤ren Initialfehler aktiv und
+    wiederholen den Poll im nÃ¤chsten Zyklus.
+  * Konfigurierbare TCP-/Prozessparameter.
+  * Integration-Smoke-Tests fÃ¼r Matrix, Bus, Events, Backup und Adapter.
+  * Ein Matrix-Performance-Smoke ist vorhanden; Pi-5-Messungen und umfangreiche
+    Benchmarks fehlen.
 
-  - Phase 1 (kritisch): Alexa, Bosch, FRITZ!Box, MQTT, KNX, Modbus, Zigbee, Homematic, Shelly, Philips Hue
-  - Phase 2: mittlere Adapter
-  - Phase 3: kleine Adapter
-  - Phase 4: ioBroker-Adapter nur noch als Legacy-Feature
+===== Sprint 9 â€“ Migration Phase 2 =====
+
+**Stand:** Native Adapter-DLLs und lokale Protokoll-Fixtures vorhanden; reale GerÃ¤teabnahme offen.
+
+FRITZ!Box, Bosch, KNX und Modbus besitzen konfigurierbare native Protokoll- und
+State-Mappings mit lokalen HTTP-/UDP-/TCP-Fixtures. VollstÃ¤ndige GerÃ¤tevarianten
+und Hardwareabnahmen bleiben offen.
+
+===== Sprint 10 â€“ Migration Phase 3 =====
+
+**Stand:** Native Adapter-DLLs und lokale HTTP-/XML-Fixtures vorhanden; Cloud-/CCU-Abnahme offen.
+
+Homematic und Alexa besitzen native, konfigurierbare HTTP-VertrÃ¤ge mit lokalen
+Fixtures; konkrete CCU-/Cloud-Authentifizierungsabnahmen bleiben offen.
+
+===== Sprint 11 â€“ Finalisierung =====
+
+**Stand:** Weitgehend umgesetzt; Release-Abnahme offen.
+
+  * Developer Guide und Adapter SDK vorhanden.
+  * SHA-256-verifiziertes Backup-System vorhanden.
+  * State-Permissions vorhanden.
+  * ReleaseCandidateManifest vorhanden.
+  * Authentifizierte AdminUI, checksum-geprÃ¼fte Adapterpakete, Release-Candidate-
+    Builder und SDK-Dokumentation vorhanden.
+  * Frischer Release-Publish enthÃ¤lt Konfigurations-/Snapshot-Templates und alle
+    elf externen Adapter-DLLs; ein realer Publish-Ordner ist per Smoke-Test
+    direkt als Release-Candidate verifizierbar.
+  * RSA-SHA256-Signatur und Trust-Key-PrÃ¼fung fÃ¼r Release-Manifeste sind
+    implementiert; ein produktiver SchlÃ¼ssel-/Signaturprozess sowie Hardware- und
+    Migrationsabnahmen fehlen noch.
+
+===== Verbindliche PrÃ¼fkommandos =====
+
+<code>
+dotnet build ioBroker-NewGen.sln -c Release --no-restore
+dotnet run --project tests/IntegrationTests/IntegrationTests.csproj -c Release --no-build
+dotnet publish ioBroker-NewGen.csproj -c Release --no-restore -o .artifacts/beta0.2.0/publish-final
+dotnet run --project tests/IntegrationTests/IntegrationTests.csproj -c Release --no-build -- --release-publish .artifacts/beta0.2.0/publish-final
+</code>

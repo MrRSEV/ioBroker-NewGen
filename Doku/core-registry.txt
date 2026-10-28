@@ -1,4 +1,4 @@
-====== Core/Registry – AdapterRegistry ======
+====== Core/Registry ï¿½ AdapterRegistry ======
 
 Namespace: ''ioBroker_NewGen.Core.Registry''
 
@@ -15,7 +15,7 @@ public enum AdapterStatus
     Connecting,    // Verbindung/Prozess wird aufgebaut
     Connected,     // aktiv und betriebsbereit
     Disconnected,  // geordnet getrennt/gestoppt
-    Faulted        // abgestürzt / Fehlerzustand
+    Faulted        // abgestï¿½rzt / Fehlerzustand
 }
 </code>
 
@@ -26,33 +26,33 @@ public enum AdapterStatus
 | Id                    | string                     | Eindeutige ID, Format "Name.id" (z. B. "mqtt.0") |
 | Type                  | AdapterType                | Custom oder IoBroker |
 | Status                | AdapterStatus              | Aktueller Lebenszyklus-Status |
-| Metadata              | Dictionary<string,string>  | Zusätzliche Infos (z. B. scriptPath) |
-| TcpEndpoint           | string?                    | Nur für IoBroker: Remote-Endpunkt der TCP-Verbindung |
-| InstanceReference     | object?                    | Nur für Custom: Referenz auf geladene Plugin-Instanz (Sprint 3) |
+| Metadata              | Dictionary<string,string>  | Zusï¿½tzliche Infos (z. B. scriptPath) |
+| TcpEndpoint           | string?                    | Nur fï¿½r IoBroker: Remote-Endpunkt der TCP-Verbindung |
+| InstanceReference     | object?                    | Nur fï¿½r Custom: Referenz auf geladene Plugin-Instanz (Sprint 3) |
 | RegisteredAt          | DateTime                   | Zeitpunkt der Registrierung (UTC) |
 | LastSeenAt            | DateTime?                  | Zeitpunkt des letzten Lebenszeichens |
 
-===== AdapterRegistry – API =====
+===== AdapterRegistry ï¿½ API =====
 
 ^ Methode                                                            ^ Beschreibung ^
-| ''Register(name, type, metadata?)'' ? AdapterRegistration          | Registriert neuen Adapter, vergibt automatisch die nächste freie ID ("Name.id") |
-| ''AssignNextId(name)'' ? string                                    | Vergibt nur die nächste ID, ohne zu registrieren (intern von ''Register'' genutzt) |
+| ''Register(name, type, metadata?)'' ? AdapterRegistration          | Registriert neuen Adapter, vergibt automatisch die nï¿½chste freie ID ("Name.id") |
+| ''AssignNextId(name)'' ? string                                    | Vergibt nur die nï¿½chste ID, ohne zu registrieren (intern von ''Register'' genutzt) |
 | ''Get(id)'' ? AdapterRegistration?                                 | Liefert Registrierung zur ID |
-| ''Exists(id)'' ? bool                                              | Prüft Existenz |
+| ''Exists(id)'' ? bool                                              | Prï¿½ft Existenz |
 | ''GetAll()'' ? IReadOnlyCollection<AdapterRegistration>            | Alle registrierten Adapter |
 | ''GetByType(type)'' ? IReadOnlyCollection<AdapterRegistration>     | Gefiltert nach Custom/IoBroker |
 | ''Unregister(id)'' ? bool                                          | Entfernt einen Adapter |
 | ''UpdateStatus(id, status, touchLastSeen = true)''                 | Aktualisiert Status (+ optional LastSeenAt) |
 
-**ID-Vergabe:** Pro Adaptername wird intern ein Zähler geführt (beginnend bei 0).
-Jeder ''Register("mqtt", ...)''-Aufruf vergibt die nächste freie Instanznummer,
-z. B. "mqtt.0", danach "mqtt.1" usw. – konsistent mit dem ioBroker-Namensschema.
+**ID-Vergabe:** Pro Adaptername wird intern ein Zï¿½hler gefï¿½hrt (beginnend bei 0).
+Jeder ''Register("mqtt", ...)''-Aufruf vergibt die nï¿½chste freie Instanznummer,
+z. B. "mqtt.0", danach "mqtt.1" usw. ï¿½ konsistent mit dem ioBroker-Namensschema.
 
 ===== Verwendung =====
 
   * **TCP-Bridge** (siehe [[core-bridge]]): Registriert eingehende Legacy-Adapter
     beim Handshake automatisch als ''AdapterType.IoBroker''.
   * **NodeAdapterRuntime**: Registriert Node.js-Adapter vor dem Prozessstart,
-    aktualisiert den Status während Start/Stop/Crash-Recovery.
-  * **MainRuntimeContext**: Hält die zentrale ''AdapterRegistry''-Instanz
+    aktualisiert den Status wï¿½hrend Start/Stop/Crash-Recovery.
+  * **MainRuntimeContext**: Hï¿½lt die zentrale ''AdapterRegistry''-Instanz
     (Property ''AdapterRegistry''), initialisiert in ''InitializeMatrixAndBus''.

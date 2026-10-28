@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,10 +11,10 @@ using RSEV.Utilities.Processes;
 namespace ioBroker_NewGen.Core.Bridge
 {
     /// <summary>
-    /// Verwaltet isolierte Node.js-Prozesse für Legacy-ioBroker-Adapter.
+    /// Verwaltet isolierte Node.js-Prozesse fï¿½r Legacy-ioBroker-Adapter.
     /// Nutzt die Prozess-Infrastruktur aus RSEV.Utilities
     /// (<see cref="NodeProcess"/>, <see cref="RuntimeProcessController"/>)
-    /// und ergänzt Crash-Recovery sowie periodische Heartbeat-/Health-Checks.
+    /// und ergï¿½nzt Crash-Recovery sowie periodische Heartbeat-/Health-Checks.
     /// </summary>
     public sealed class NodeAdapterRuntime : IAsyncDisposable
     {
@@ -24,7 +25,10 @@ namespace ioBroker_NewGen.Core.Bridge
         private readonly TimeSpan _healthCheckInterval;
 
         private readonly ConcurrentDictionary<string, string> _processIdByAdapterId = new();
+        private readonly ConcurrentDictionary<string, ProcessSpec> _processSpecByAdapterId = new();
+        private readonly SemaphoreSlim _healthCheckGate = new(1, 1);
         private Timer? _healthCheckTimer;
+        private CancellationTokenSource? _monitoringCts;
 
         public NodeAdapterRuntime(
             RuntimeProcessController processController,
@@ -54,11 +58,12 @@ namespace ioBroker_NewGen.Core.Bridge
             registration.Metadata["scriptPath"] = scriptPath;
             _adapterRegistry.UpdateStatus(registration.Id, AdapterStatus.Connecting);
 
-            var process = new NodeProcess(registration.Id, scriptPath, arguments, _logger);
-            process.OnStdErr += (_, line) => _logger.LogWarning($"[Node:{registration.Id}] {line}");
+            var spec = new ProcessSpec(registration.Id, scriptPath, arguments ?? Array.Empty<string>());
+            var process = CreateProcess(spec);
 
             _processController.Register(process);
             _processIdByAdapterId[registration.Id] = process.ProcessId;
+            _processSpecByAdapterId[registration.Id] = spec;
 
             var started = await process.StartAsync();
             _adapterRegistry.UpdateStatus(registration.Id, started ? AdapterStatus.Connected : AdapterStatus.Faulted);
@@ -72,6 +77,43 @@ namespace ioBroker_NewGen.Core.Bridge
         }
 
         /// <summary>
+        /// Startet alle Legacy-Adapter, die in einem Adapterverzeichnis einen
+        /// Ã¼blichen Node-Einstiegspunkt besitzen. Die Adapter erhalten die
+        /// Bridge-Verbindungsdaten als Kommandozeilenargumente.
+        /// </summary>
+        public async Task<IReadOnlyCollection<AdapterRegistration>> StartDirectoryAsync(
+            string directory,
+            string bridgeHost,
+            int bridgePort)
+        {
+            if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
+            {
+                return Array.Empty<AdapterRegistration>();
+            }
+
+            var registrations = new List<AdapterRegistration>();
+            foreach (var adapterDirectory in Directory.EnumerateDirectories(directory).OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+            {
+                var scriptPath = new[] { "main.js", "index.js", "adapter.js" }
+                    .Select(file => Path.Combine(adapterDirectory, file))
+                    .FirstOrDefault(File.Exists);
+                if (scriptPath is null)
+                {
+                    _logger.LogWarning($"[NodeRuntime] Kein Einstiegsskript in '{adapterDirectory}' gefunden.");
+                    continue;
+                }
+
+                var name = Path.GetFileName(adapterDirectory);
+                registrations.Add(await StartAdapterAsync(
+                    name,
+                    scriptPath,
+                    new[] { "--host", bridgeHost, "--port", bridgePort.ToString(System.Globalization.CultureInfo.InvariantCulture), "--name", name }));
+            }
+
+            return registrations;
+        }
+
+        /// <summary>
         /// Stoppt den Node.js-Prozess eines Adapters und aktualisiert dessen Status.
         /// </summary>
         public async Task<bool> StopAdapterAsync(string adapterId)
@@ -82,6 +124,9 @@ namespace ioBroker_NewGen.Core.Bridge
             }
 
             var stopped = await _processController.StopAsync(processId);
+            _processController.Unregister(processId);
+            _processIdByAdapterId.TryRemove(adapterId, out _);
+            _processSpecByAdapterId.TryRemove(adapterId, out _);
             _adapterRegistry.UpdateStatus(adapterId, AdapterStatus.Disconnected);
             return stopped;
         }
@@ -92,9 +137,11 @@ namespace ioBroker_NewGen.Core.Bridge
         /// </summary>
         public void StartHealthMonitoring()
         {
+            StopHealthMonitoring();
+            _monitoringCts = new CancellationTokenSource();
             _healthCheckTimer?.Dispose();
             _healthCheckTimer = new Timer(
-                _ => CheckAndRecoverAsync().GetAwaiter().GetResult(),
+                _ => _ = CheckAndRecoverGuardedAsync(_monitoringCts.Token),
                 state: null,
                 dueTime: _healthCheckInterval,
                 period: _healthCheckInterval);
@@ -107,6 +154,9 @@ namespace ioBroker_NewGen.Core.Bridge
         {
             _healthCheckTimer?.Dispose();
             _healthCheckTimer = null;
+            _monitoringCts?.Cancel();
+            _monitoringCts?.Dispose();
+            _monitoringCts = null;
         }
 
         /// <summary>
@@ -122,10 +172,40 @@ namespace ioBroker_NewGen.Core.Bridge
             }
         }
 
-        private async Task CheckAndRecoverAsync()
+        private async Task CheckAndRecoverGuardedAsync(CancellationToken cancellationToken)
+        {
+            var acquired = false;
+            try
+            {
+                acquired = await _healthCheckGate.WaitAsync(0, cancellationToken);
+                if (!acquired)
+                {
+                    return;
+                }
+
+                await CheckAndRecoverAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"[NodeRuntime] Health-Check-Zyklus fehlgeschlagen: {ex}");
+            }
+            finally
+            {
+                if (acquired)
+                {
+                    _healthCheckGate.Release();
+                }
+            }
+        }
+
+        private async Task CheckAndRecoverAsync(CancellationToken cancellationToken)
         {
             foreach (var (adapterId, processId) in _processIdByAdapterId.ToList())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var process = _processController.Get(processId);
                 if (process is null)
                 {
@@ -139,18 +219,18 @@ namespace ioBroker_NewGen.Core.Bridge
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError($"[NodeRuntime] Health-Check für Adapter '{adapterId}' fehlgeschlagen: {ex.Message}");
+                    _logger.LogError($"[NodeRuntime] Health-Check fï¿½r Adapter '{adapterId}' fehlgeschlagen: {ex.Message}");
                     healthy = false;
                 }
 
                 if (healthy == false)
                 {
-                    _logger.LogWarning($"[NodeRuntime] Adapter '{adapterId}' unhealthy/abgestürzt – Neustart nach {_crashRestartDelay.TotalMilliseconds} ms.");
+                    _logger.LogWarning($"[NodeRuntime] Adapter '{adapterId}' unhealthy/abgestï¿½rzt ï¿½ Neustart nach {_crashRestartDelay.TotalMilliseconds} ms.");
                     _adapterRegistry.UpdateStatus(adapterId, AdapterStatus.Faulted);
 
-                    await Task.Delay(_crashRestartDelay);
+                    await Task.Delay(_crashRestartDelay, cancellationToken);
 
-                    var restarted = await process.RestartAsync();
+                    var restarted = await RestartProcessAsync(adapterId, processId, cancellationToken);
                     _adapterRegistry.UpdateStatus(adapterId, restarted ? AdapterStatus.Connected : AdapterStatus.Faulted);
 
                     if (restarted)
@@ -168,6 +248,47 @@ namespace ioBroker_NewGen.Core.Bridge
         public async ValueTask DisposeAsync()
         {
             await StopAllAsync();
+            _healthCheckGate.Dispose();
         }
+
+        private NodeProcess CreateProcess(ProcessSpec spec)
+        {
+            var process = new NodeProcess(spec.AdapterId, spec.ScriptPath, spec.Arguments, _logger);
+            process.OnStdErr += (_, line) => _logger.LogWarning($"[Node:{spec.AdapterId}] {line}");
+            return process;
+        }
+
+        private async Task<bool> RestartProcessAsync(
+            string adapterId,
+            string oldProcessId,
+            CancellationToken cancellationToken)
+        {
+            if (!_processSpecByAdapterId.TryGetValue(adapterId, out var spec))
+            {
+                return false;
+            }
+
+            var oldProcess = _processController.Get(oldProcessId);
+            if (oldProcess is not null)
+            {
+                try
+                {
+                    await oldProcess.StopAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug($"[NodeRuntime] Alter Prozess '{oldProcessId}' konnte nicht beendet werden: {ex.Message}");
+                }
+            }
+
+            _processController.Unregister(oldProcessId);
+            var replacement = CreateProcess(spec);
+            _processController.Register(replacement);
+            _processIdByAdapterId[adapterId] = replacement.ProcessId;
+            var started = await replacement.StartAsync(CancellationToken.None);
+            return started || _adapterRegistry.Get(adapterId)?.Status == AdapterStatus.Connected;
+        }
+
+        private sealed record ProcessSpec(string AdapterId, string ScriptPath, string[] Arguments);
     }
 }

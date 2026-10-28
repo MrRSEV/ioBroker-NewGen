@@ -1,7 +1,7 @@
 # ioBroker-NewGen
 
 > Preview of an emerging project called **ioBroker-NewGen**.  
-> Current status: **In development**.
+> Current status: **beta0.2.0** (Sprint-1-bis-11-Refactoring; Hardware-/Cloud-Abnahmen ausstehend).
 
 ## Short Description
 
@@ -9,6 +9,10 @@
 Objects, states, history samples, and metadata are *materialized views* extracted from this vector space.
 
 The goal is a clean separation between core logic, adapter runtime, routing, and user interface.
+
+The runtime uses **RSEV.Utilities 3.0.0.0** as its lifecycle, messaging, event,
+process and assembly-loading infrastructure. AdminUI and all native adapters
+run as separate external assemblies under `Adapters/custom`.
 
 ---
 
@@ -179,6 +183,10 @@ Role and permission validation.
 ### API
 - **CanWrite(user, stateId) -> bool**  
 - **CanRead(user, stateId) -> bool**
+
+`DefaultRoleService` additionally supports persistent user-specific permissions,
+roles and role assignments in `roles.json`; the external AdminUI manages these
+through `/api/permissions`, `/api/roles` and `/api/users`.
 
 ---
 

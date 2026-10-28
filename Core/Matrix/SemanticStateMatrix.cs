@@ -4,18 +4,21 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using ioBroker_NewGen.Core.Bus;
+using ioBroker_NewGen.Core.Events;
 
 namespace ioBroker_NewGen.Core.Matrix
 {
     /// <summary>
-    /// Zentrale Engine für Objekte, States, Semantik, History und Persistenz.
+    /// Zentrale Engine fï¿½r Objekte, States, Semantik, History und Persistenz.
     /// Geometrischer, mehrdimensionaler Vectorspace: jeder State besitzt neben
-    /// seinem Wert auch ein semantisches Embedding, über das sich der gesamte
-    /// Objektbaum durchsuchen lässt (<see cref="SemanticQuery"/>).
-    /// Thread-sicher über <see cref="ConcurrentDictionary{TKey,TValue}"/> und
-    /// interne Locks in <see cref="StateNode"/>.
+    /// seinem Wert auch ein semantisches Embedding, ï¿½ber das sich der gesamte
+    /// Objektbaum durchsuchen lï¿½sst (<see cref="SemanticQuery"/>).
+    /// Thread-sicher Ã¼ber einen zentralen <see cref="ReaderWriterLockSlim"/>
+    /// fÃ¼r Matrix-/Index-Konsistenz sowie interne Locks in <see cref="StateNode"/>.
     /// </summary>
     public sealed class SemanticStateMatrix : IDisposable
     {
@@ -23,11 +26,14 @@ namespace ioBroker_NewGen.Core.Matrix
         private readonly ConcurrentDictionary<string, StateNode> _states = new();
         private readonly ConcurrentDictionary<string, List<Action<StateNode>>> _subscriptions = new();
         private readonly object _subscriptionLock = new();
+        private readonly ReaderWriterLockSlim _matrixLock = new(LockRecursionPolicy.NoRecursion);
 
         private readonly IRoleService _roleService;
         private readonly IEmbeddingService _embeddingService;
         private readonly IVectorIndex _semanticIndex;
         private readonly string _snapshotPath;
+        private readonly int _maxInMemoryHistory;
+        private readonly SystemEventBus? _eventBus;
 
         private Timer? _cronTimer;
 
@@ -42,7 +48,9 @@ namespace ioBroker_NewGen.Core.Matrix
             string snapshotPath,
             IRoleService? roleService = null,
             IEmbeddingService? embeddingService = null,
-            IVectorIndex? semanticIndex = null)
+            IVectorIndex? semanticIndex = null,
+            int maxInMemoryHistory = 500,
+            SystemEventBus? eventBus = null)
         {
             if (string.IsNullOrWhiteSpace(snapshotPath))
             {
@@ -53,52 +61,140 @@ namespace ioBroker_NewGen.Core.Matrix
             _roleService = roleService ?? new DefaultRoleService();
             _embeddingService = embeddingService ?? new HashingEmbeddingService();
             _semanticIndex = semanticIndex ?? new VectorIndex();
+            _maxInMemoryHistory = maxInMemoryHistory > 0
+                ? maxInMemoryHistory
+                : throw new ArgumentOutOfRangeException(nameof(maxInMemoryHistory));
+            _eventBus = eventBus;
         }
 
         /// <summary>
+        /// Liefert den fÃ¼r diese Matrix verwendeten Rollen-/Berechtigungsdienst.
+        /// Der Admin-Adapter kann darÃ¼ber Benutzer- und Rollenrechte verwalten,
+        /// ohne die interne Matrixstruktur zu umgehen.
+        /// </summary>
+        public IRoleService RoleService => _roleService;
+
+        /// <summary>
         /// Registriert ein Objekt, erzeugt dessen Objekt-Embedding, legt den
-        /// zugehörigen <see cref="StateNode"/> an und fügt einen Eintrag zum
+        /// zugehï¿½rigen <see cref="StateNode"/> an und fï¿½gt einen Eintrag zum
         /// semantischen Index hinzu.
         /// </summary>
         public bool RegisterObject(MatrixObject matrixObject)
         {
             ArgumentNullException.ThrowIfNull(matrixObject);
 
-            var added = _objects.TryAdd(matrixObject.Id, matrixObject);
-
-            var state = _states.GetOrAdd(matrixObject.Id, id => new StateNode(id));
-            foreach (var kvp in matrixObject.Meta)
+            if (matrixObject.StateDefinition is not null &&
+                !matrixObject.StateDefinition.ValidateDefinition(out _))
             {
-                state.Meta[kvp.Key] = kvp.Value;
+                return false;
             }
 
-            var embedding = _embeddingService.Encode(matrixObject.BuildEmbeddingSourceText());
-            state.Restore(state.Value, state.Timestamp, embedding, state.LastWrittenBy);
-            _semanticIndex.Add(matrixObject.Id, embedding);
+            _matrixLock.EnterWriteLock();
+            try
+            {
+                if (!_objects.TryAdd(matrixObject.Id, matrixObject))
+                {
+                    return false;
+                }
 
-            return added;
+                var state = _states.GetOrAdd(matrixObject.Id, id => new StateNode(id, _maxInMemoryHistory));
+                foreach (var kvp in matrixObject.Meta)
+                {
+                    state.Meta[kvp.Key] = kvp.Value;
+                }
+
+                var embedding = _embeddingService.Encode(matrixObject.BuildEmbeddingSourceText());
+                state.Restore(state.Value, state.Timestamp, embedding, state.LastWrittenBy);
+                _semanticIndex.Add(matrixObject.Id, embedding);
+
+                return true;
+            }
+            finally
+            {
+                _matrixLock.ExitWriteLock();
+            }
         }
 
         /// <summary>
-        /// Liefert das registrierte Objekt zur übergebenen ID, oder <c>null</c>, falls unbekannt.
+        /// Liefert das registrierte Objekt zur ï¿½bergebenen ID, oder <c>null</c>, falls unbekannt.
         /// </summary>
         public MatrixObject? GetObject(string id)
         {
-            return _objects.TryGetValue(id, out var matrixObject) ? matrixObject : null;
+            _matrixLock.EnterReadLock();
+            try
+            {
+                return _objects.TryGetValue(id, out var matrixObject) ? matrixObject : null;
+            }
+            finally
+            {
+                _matrixLock.ExitReadLock();
+            }
         }
 
         /// <summary>
-        /// Liefert den aktuellen Zustand (State) zur übergebenen ID, oder <c>null</c>, falls unbekannt.
+        /// Entfernt ein Objekt, den zugehÃ¶rigen State und den Indexeintrag.
+        /// </summary>
+        public bool RemoveObject(string id)
+        {
+            _matrixLock.EnterWriteLock();
+            try
+            {
+                var removedObject = _objects.TryRemove(id, out _);
+                var removedState = _states.TryRemove(id, out _);
+                _semanticIndex.Remove(id);
+
+                lock (_subscriptionLock)
+                {
+                    _subscriptions.TryRemove(id, out _);
+                }
+
+                return removedObject || removedState;
+            }
+            finally
+            {
+                _matrixLock.ExitWriteLock();
+            }
+        }
+
+        /// <summary>
+        /// Liefert den aktuellen Zustand (State) zur ï¿½bergebenen ID, oder <c>null</c>, falls unbekannt.
         /// </summary>
         public StateNode? GetState(string id)
         {
-            return _states.TryGetValue(id, out var state) ? state : null;
+            _matrixLock.EnterReadLock();
+            try
+            {
+                return _states.TryGetValue(id, out var state) ? state : null;
+            }
+            finally
+            {
+                _matrixLock.ExitReadLock();
+            }
+        }
+
+        /// <summary>
+        /// Liefert einen State nur, wenn der Benutzer Leserechte besitzt.
+        /// </summary>
+        public StateNode? GetState(string id, string user)
+        {
+            return _roleService.CanRead(user, id) ? GetState(id) : null;
+        }
+
+        public bool SetPermissions(string user, string stateId, bool canRead, bool canWrite)
+        {
+            if (_roleService is not IRoleManagementService roleManagementService)
+            {
+                return false;
+            }
+
+            roleManagementService.SetPermissions(user, stateId, canRead, canWrite);
+            return true;
         }
 
         /// <summary>
         /// Setzt den Wert eines States. Validiert zuvor die Schreibrechte des
-        /// übergebenen Benutzers, erzeugt ein Payload-Embedding, aktualisiert
-        /// den <see cref="StateNode"/>, hängt eine <see cref="HistorySample"/>
+        /// ï¿½bergebenen Benutzers, erzeugt ein Payload-Embedding, aktualisiert
+        /// den <see cref="StateNode"/>, hï¿½ngt eine <see cref="HistorySample"/>
         /// an, aktualisiert den semantischen Index und benachrichtigt alle Subscriber.
         /// </summary>
         /// <returns><c>true</c> bei Erfolg, <c>false</c> wenn der Benutzer keine Schreibrechte besitzt.</returns>
@@ -109,21 +205,107 @@ namespace ioBroker_NewGen.Core.Matrix
                 return false;
             }
 
-            var state = _states.GetOrAdd(id, key => new StateNode(key));
             var embeddingSource = $"{id} {value}";
             var embedding = _embeddingService.Encode(embeddingSource);
+            StateNode state;
 
-            state.Update(value, embedding, user);
-            _semanticIndex.Add(id, embedding);
+            _matrixLock.EnterWriteLock();
+            try
+            {
+                if (_objects.TryGetValue(id, out var matrixObject) &&
+                    matrixObject.StateDefinition is not null &&
+                    !matrixObject.StateDefinition.Validate(value, out _))
+                {
+                    return false;
+                }
+
+                state = _states.GetOrAdd(id, key => new StateNode(key, _maxInMemoryHistory));
+                state.Update(value, embedding, user);
+                _semanticIndex.Add(id, embedding);
+            }
+            finally
+            {
+                _matrixLock.ExitWriteLock();
+            }
 
             NotifySubscribers(id, state);
+            _eventBus?.PublishStateChanged(this, new StateChangedEventArgs(id, state, user));
 
             return true;
         }
 
         /// <summary>
-        /// Registriert einen Callback, der bei jeder Änderung des Zustands mit
-        /// der übergebenen ID aufgerufen wird.
+        /// Ãœbernimmt einen StateUpdate-Frame vom Systembus in die Matrix.
+        /// Der Bus bleibt dabei neutral; nur die Matrix interpretiert den
+        /// Payload anhand des ValueType-Feldes.
+        /// </summary>
+        public bool ApplyFrame(BusFrame frame)
+        {
+            ArgumentNullException.ThrowIfNull(frame);
+
+            if (frame.Kind != BusFrameKind.StateUpdate || string.IsNullOrWhiteSpace(frame.Address))
+            {
+                return false;
+            }
+
+            object? value;
+            try
+            {
+                value = DecodePayload(frame.Payload, frame.ValueType);
+            }
+            catch
+            {
+                return false;
+            }
+
+            if (!_roleService.CanWrite(frame.AdapterId, frame.Address))
+            {
+                return false;
+            }
+
+            var embedding = _embeddingService.Encode($"{frame.Address} {value}");
+            StateNode state;
+
+            _matrixLock.EnterWriteLock();
+            try
+            {
+                if (!_objects.TryGetValue(frame.Address, out var matrixObject))
+                {
+                    matrixObject = new MatrixObject
+                    {
+                        Id = frame.Address,
+                        Name = frame.Address,
+                        Type = "state"
+                    };
+                    _objects.TryAdd(frame.Address, matrixObject);
+                    _semanticIndex.Add(frame.Address, _embeddingService.Encode(matrixObject.BuildEmbeddingSourceText()));
+                }
+
+                if (matrixObject.StateDefinition is not null &&
+                    !matrixObject.StateDefinition.Validate(value, out _))
+                {
+                    return false;
+                }
+
+                state = _states.GetOrAdd(frame.Address, id => new StateNode(id, _maxInMemoryHistory));
+                state.Update(value, embedding, frame.AdapterId, frame.Timestamp == default ? null : frame.Timestamp);
+                _semanticIndex.Add(frame.Address, embedding);
+            }
+            finally
+            {
+                _matrixLock.ExitWriteLock();
+            }
+
+            NotifySubscribers(frame.Address, state);
+            _eventBus?.PublishStateChanged(
+                this,
+                new StateChangedEventArgs(frame.Address, state, frame.AdapterId));
+            return true;
+        }
+
+        /// <summary>
+        /// Registriert einen Callback, der bei jeder ï¿½nderung des Zustands mit
+        /// der ï¿½bergebenen ID aufgerufen wird.
         /// </summary>
         public void Subscribe(string id, Action<StateNode> callback)
         {
@@ -176,27 +358,39 @@ namespace ioBroker_NewGen.Core.Matrix
                 }
                 catch
                 {
-                    // Subscriber-Fehler dürfen die Matrix nicht destabilisieren.
+                    // Subscriber-Fehler dï¿½rfen die Matrix nicht destabilisieren.
                 }
             }
         }
 
         /// <summary>
-        /// Führt eine semantische Suche über alle registrierten States anhand
+        /// Fï¿½hrt eine semantische Suche ï¿½ber alle registrierten States anhand
         /// eines Freitextes durch (z. B. "Temperatur Wohnzimmer").
         /// </summary>
         public List<StateNode> SemanticQuery(string text, int k = 10)
         {
-            var queryEmbedding = _embeddingService.Encode(text);
-            var results = _semanticIndex.Search(queryEmbedding, k);
+            return SemanticQuery(text, k, "system");
+        }
 
+        public List<StateNode> SemanticQuery(string text, int k, string user)
+        {
+            var queryEmbedding = _embeddingService.Encode(text);
             var stateNodes = new List<StateNode>();
-            foreach (var (id, _) in results)
+            _matrixLock.EnterReadLock();
+            try
             {
-                if (_states.TryGetValue(id, out var state))
+                var results = _semanticIndex.Search(queryEmbedding, k);
+                foreach (var (id, _) in results)
                 {
-                    stateNodes.Add(state);
+                    if (_roleService.CanRead(user, id) && _states.TryGetValue(id, out var state))
+                    {
+                        stateNodes.Add(state);
+                    }
                 }
+            }
+            finally
+            {
+                _matrixLock.ExitReadLock();
             }
 
             return stateNodes;
@@ -208,21 +402,44 @@ namespace ioBroker_NewGen.Core.Matrix
         /// </summary>
         public IEnumerable<HistorySample> GetHistory(string id, DateTime? from = null, DateTime? to = null)
         {
-            if (!_states.TryGetValue(id, out var state))
+            return GetHistory(id, from, to, "system");
+        }
+
+        public IEnumerable<HistorySample> GetHistory(
+            string id,
+            DateTime? from,
+            DateTime? to,
+            string user)
+        {
+            if (!_roleService.CanRead(user, id))
             {
-                return Enumerable.Empty<HistorySample>();
+                return Array.Empty<HistorySample>();
             }
 
-            IEnumerable<HistorySample> samples = state.History;
+            List<HistorySample> samples;
+            _matrixLock.EnterReadLock();
+            try
+            {
+                if (!_states.TryGetValue(id, out var state))
+                {
+                    return Array.Empty<HistorySample>();
+                }
+
+                samples = state.History.ToList();
+            }
+            finally
+            {
+                _matrixLock.ExitReadLock();
+            }
 
             if (from.HasValue)
             {
-                samples = samples.Where(sample => sample.Timestamp >= from.Value);
+                samples = samples.Where(sample => sample.Timestamp >= from.Value).ToList();
             }
 
             if (to.HasValue)
             {
-                samples = samples.Where(sample => sample.Timestamp <= to.Value);
+                samples = samples.Where(sample => sample.Timestamp <= to.Value).ToList();
             }
 
             return samples.OrderBy(sample => sample.Timestamp).ToList();
@@ -233,22 +450,41 @@ namespace ioBroker_NewGen.Core.Matrix
         /// </summary>
         public string DisplayAsJson()
         {
-            var tree = _objects.Values.Select(obj => new
-            {
-                obj.Id,
-                obj.Name,
-                obj.Type,
-                obj.Meta,
-                State = _states.TryGetValue(obj.Id, out var state)
-                    ? new { state.Value, state.Timestamp, state.LastWrittenBy }
-                    : null
-            });
+            return DisplayAsJson("system");
+        }
 
-            return JsonSerializer.Serialize(tree, new JsonSerializerOptions { WriteIndented = true });
+        public string DisplayAsJson(string user)
+        {
+            _matrixLock.EnterReadLock();
+            try
+            {
+                var tree = _objects.Values
+                    .OrderBy(obj => obj.Id, StringComparer.Ordinal)
+                    .Where(obj => _roleService.CanRead(user, obj.Id))
+                    .Select(obj => new
+                    {
+                        obj.Id,
+                        obj.Name,
+                        obj.Type,
+                        Meta = obj.Meta
+                            .OrderBy(entry => entry.Key, StringComparer.Ordinal)
+                            .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal),
+                        obj.StateDefinition,
+                        State = _states.TryGetValue(obj.Id, out var state)
+                            ? new { state.Value, state.Timestamp, state.LastWrittenBy }
+                            : null
+                    });
+
+                return JsonSerializer.Serialize(tree, new JsonSerializerOptions { WriteIndented = true });
+            }
+            finally
+            {
+                _matrixLock.ExitReadLock();
+            }
         }
 
         /// <summary>
-        /// Lädt die Snapshot-Datei (sofern vorhanden), rekonstruiert States
+        /// Lï¿½dt die Snapshot-Datei (sofern vorhanden), rekonstruiert States
         /// und History sowie die semantischen Embeddings im Vektorindex.
         /// Wird typischerweise im OnStart-Lifecycle-Hook aufgerufen.
         /// </summary>
@@ -281,21 +517,29 @@ namespace ioBroker_NewGen.Core.Matrix
                     continue;
                 }
 
-                var state = _states.GetOrAdd(entry.Id, id => new StateNode(id));
-                var sample = new HistorySample(entry.Id, entry.Timestamp, NormalizeValue(entry.Value), entry.Embedding);
-                state.AppendHistorySample(sample);
-                state.Restore(sample.Value, sample.Timestamp, sample.Embedding, writtenBy: null);
-
-                _semanticIndex.Add(entry.Id, sample.Embedding);
-
-                if (!_objects.ContainsKey(entry.Id) && entry.Name is not null && entry.Type is not null)
+                _matrixLock.EnterWriteLock();
+                try
                 {
-                    _objects.TryAdd(entry.Id, new MatrixObject
+                    var state = _states.GetOrAdd(entry.Id, id => new StateNode(id, _maxInMemoryHistory));
+                    var sample = new HistorySample(entry.Id, entry.Timestamp, NormalizeValue(entry.Value), entry.Embedding);
+                    state.AppendHistorySample(sample);
+                    state.Restore(sample.Value, sample.Timestamp, sample.Embedding, writtenBy: null);
+
+                    _semanticIndex.Add(entry.Id, sample.Embedding);
+
+                    if (!_objects.ContainsKey(entry.Id) && entry.Name is not null && entry.Type is not null)
                     {
-                        Id = entry.Id,
-                        Name = entry.Name,
-                        Type = entry.Type
-                    });
+                        _objects.TryAdd(entry.Id, new MatrixObject
+                        {
+                            Id = entry.Id,
+                            Name = entry.Name,
+                            Type = entry.Type
+                        });
+                    }
+                }
+                finally
+                {
+                    _matrixLock.ExitWriteLock();
                 }
             }
         }
@@ -314,26 +558,39 @@ namespace ioBroker_NewGen.Core.Matrix
                 Directory.CreateDirectory(directory);
             }
 
-            await using var writer = new StreamWriter(_snapshotPath, append: false);
-            foreach (var state in _states.Values)
+            List<SnapshotEntry> entries;
+            _matrixLock.EnterReadLock();
+            try
             {
-                var matrixObject = _objects.GetValueOrDefault(state.Id);
-
-                foreach (var sample in state.History)
+                entries = new List<SnapshotEntry>();
+                foreach (var state in _states.Values.OrderBy(state => state.Id, StringComparer.Ordinal))
                 {
-                    var entry = new SnapshotEntry
-                    {
-                        Id = sample.Id,
-                        Timestamp = sample.Timestamp,
-                        Value = sample.Value,
-                        Embedding = sample.Embedding,
-                        Name = matrixObject?.Name,
-                        Type = matrixObject?.Type
-                    };
+                    var matrixObject = _objects.GetValueOrDefault(state.Id);
 
-                    var json = JsonSerializer.Serialize(entry);
-                    await writer.WriteLineAsync(json.AsMemory(), cancellationToken);
+                    foreach (var sample in state.History.OrderBy(sample => sample.Timestamp))
+                    {
+                        entries.Add(new SnapshotEntry
+                        {
+                            Id = sample.Id,
+                            Timestamp = sample.Timestamp,
+                            Value = sample.Value,
+                            Embedding = sample.Embedding,
+                            Name = matrixObject?.Name,
+                            Type = matrixObject?.Type
+                        });
+                    }
                 }
+            }
+            finally
+            {
+                _matrixLock.ExitReadLock();
+            }
+
+            await using var writer = new StreamWriter(_snapshotPath, append: false);
+            foreach (var entry in entries)
+            {
+                var json = JsonSerializer.Serialize(entry);
+                await writer.WriteLineAsync(json.AsMemory(), cancellationToken);
             }
         }
 
@@ -363,6 +620,7 @@ namespace ioBroker_NewGen.Core.Matrix
         public void Dispose()
         {
             StopCronSnapshot();
+            _matrixLock.Dispose();
         }
 
         private static object? NormalizeValue(object? value)
@@ -381,6 +639,37 @@ namespace ioBroker_NewGen.Core.Matrix
             }
 
             return value;
+        }
+
+        private static object? DecodePayload(ReadOnlyMemory<byte> payload, string valueType)
+        {
+            if (payload.IsEmpty)
+            {
+                return null;
+            }
+
+            var normalizedType = (valueType ?? string.Empty).Trim().ToLowerInvariant();
+            var text = Encoding.UTF8.GetString(payload.Span);
+
+            return normalizedType switch
+            {
+                "bool" or "boolean" => bool.Parse(text),
+                "byte" => byte.Parse(text, System.Globalization.CultureInfo.InvariantCulture),
+                "short" => short.Parse(text, System.Globalization.CultureInfo.InvariantCulture),
+                "int" or "int32" or "integer" => int.Parse(text, System.Globalization.CultureInfo.InvariantCulture),
+                "long" or "int64" => long.Parse(text, System.Globalization.CultureInfo.InvariantCulture),
+                "float" or "single" => float.Parse(text, System.Globalization.CultureInfo.InvariantCulture),
+                "double" or "decimal" or "number" => double.Parse(text, System.Globalization.CultureInfo.InvariantCulture),
+                "string" or "text" => text,
+                "json" => DecodeJson(text),
+                _ => payload.ToArray()
+            };
+        }
+
+        private static object? DecodeJson(string text)
+        {
+            using var document = JsonDocument.Parse(text);
+            return NormalizeValue(document.RootElement.Clone());
         }
 
         private static async IAsyncEnumerable<string> ReadLinesAsync(string path, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)

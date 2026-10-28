@@ -6,7 +6,7 @@ using ioBroker_NewGen.Controllers;
 namespace ioBroker_NewGen.Startup
 {
     /// <summary>
-    /// Wird beim geordneten Herunterfahren des Systems ausgeführt.
+    /// Wird beim geordneten Herunterfahren des Systems ausgefï¿½hrt.
     /// </summary>
     public class OnStop : IOnStop
     {
@@ -25,6 +25,15 @@ namespace ioBroker_NewGen.Startup
                     await mainContext.Matrix.WriteSnapshotAsync();
                     context.Logger.LogInfo("Snapshot der SemanticStateMatrix geschrieben.");
                 }
+
+                if (mainContext.BackupService is not null)
+                {
+                    var backupDirectory = Path.Combine(AppContext.BaseDirectory, "backups");
+                    var backupPath = await mainContext.BackupService.CreateBackupAsync(backupDirectory);
+                    context.Logger.LogInfo($"Backup erstellt: {backupPath}");
+                }
+
+                mainContext.ShutdownInfrastructure();
             }
 
             context.IsRunning = false;
@@ -46,6 +55,15 @@ namespace ioBroker_NewGen.Startup
                     mainContext.Matrix.WriteSnapshotAsync().GetAwaiter().GetResult();
                     context.Logger.LogInfo("Snapshot der SemanticStateMatrix geschrieben.");
                 }
+
+                if (mainContext.BackupService is not null)
+                {
+                    var backupDirectory = Path.Combine(AppContext.BaseDirectory, "backups");
+                    var backupPath = mainContext.BackupService.CreateBackupAsync(backupDirectory).GetAwaiter().GetResult();
+                    context.Logger.LogInfo($"Backup erstellt: {backupPath}");
+                }
+
+                mainContext.ShutdownInfrastructure();
             }
 
             context.IsRunning = false;

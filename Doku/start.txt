@@ -1,54 +1,42 @@
-====== ioBroker-NewGen – Projektdokumentation ======
+====== ioBroker-NewGen â€“ Projektdokumentation ======
 
 Diese Dokumentation beschreibt den aktuellen Entwicklungsstand des Projekts
-**ioBroker-CSharp-Fork (ioBroker-NewGen)** nach Abschluss von **Sprint 2 – TCP-Bridge & Legacy Runtime**.
+**ioBroker-CSharp-Fork (ioBroker-NewGen)** mit RSEV.Utilities **3.0.0.0**.
 
-  * **Stand:** Version 0.1.0 (Tag ''dev-0.1.0'') + Sprint-2-Erweiterungen (noch ungetaggt)
+  * **Version:** beta0.2.0 / Entwicklungszweig
   * **Zielplattform:** .NET 9
+  * **RSEV.Utilities:** 3.0.0.0
   * **Repository:** https://github.com/MrRSEV/ioBroker-NewGen
-
-Diese Seite dient als Einstiegspunkt (Startseite) für das DokuWiki unter ''/Doku''.
-Weitere Seiten:
-
-  * [[architektur|Architekturübersicht]]
-  * [[core-matrix|Core/Matrix – Semantische Zustandsmatrix]]
-  * [[core-bus|Core/Bus – Systembus]]
-  * [[core-routing|Core/Routing – AdapterRouter]]
-  * [[core-bridge|Core/Bridge – TCP-Bridge & Node.js-Adapter-Runtime]]
-  * [[core-registry|Core/Registry – AdapterRegistry]]
-  * [[runtime-lifecycle|Runtime & Lifecycle (FirstRun, OnStart, OnStop)]]
-  * [[konfiguration|Konfiguration (config.toml)]]
-  * [[sprintplan|Sprintplan & Roadmap]]
-  * [[changelog|Changelog]]
 
 ===== Projektvision =====
 
-Eine modernisierte, stabile, objektorientierte Smarthome-Matrix als langfristige
-Weiterentwicklung des ioBroker-Ökosystems – nicht als Konkurrenz zu Home Assistant,
-sondern als moderne Alternative für Entwickler und Power-User.
+Eine moderne, stabile, objektorientierte Smarthome-Matrix mit isolierten
+Legacy-Runtimes und einer einheitlichen Adapter-API.
 
-**Primäre Ziele:**
-  * Ersetzen der historischen ioBroker-Architektur durch eine moderne C#-Zustandsmatrix
-  * Isolierte Node.js-Runtimes für Legacy-Adapter
-  * Einheitliche Adapter-API für alle Adaptertypen
-  * Stabile, objektorientierte Echtzeit-State-Sync-Engine
-  * Neues Admin-UI in C#
-  * Langfristige Migration aller beliebten ioBroker-Adapter nach C#
+===== Aktueller Umsetzungsstand =====
 
-===== Aktueller Umsetzungsstand (Kurzüberblick) =====
+  * Sprint 1: Core Fundament â€“ umgesetzt
+  * Sprint 2: TCP-Bridge & Legacy Runtime â€“ weitgehend umgesetzt, externe Abnahme offen
+  * Sprint 3: CustomAdapter API, externe DLLs und optionale Dependencies â€“ umgesetzt
+  * Sprint 4: StateEngine & EventBus â€“ umgesetzt
+  * Sprint 5: AdminUI als externe AdminUI.dll â€“ weitgehend umgesetzt
+  * Sprint 6: Installation & Deployment â€“ lokale/HTTP-Pakete umgesetzt
+  * Sprint 7: Kritische Adapter â€“ native DLLs, Hardwaretests offen
+  * Sprint 8: Stabilisierung & Performance â€“ Smoke-/Basislasttests vorhanden
+  * Sprint 9: Migration Phase 2 â€“ native DLLs, GerÃ¤te-Fixtures offen
+  * Sprint 10: Migration Phase 3 â€“ native DLLs, Cloud-/CCU-Fixtures offen
+  * Sprint 11: Finalisierung â€“ Release-Candidate-Publish verifiziert, produktive Abnahme offen
 
-^ Bereich                     ^ Status        ^ Beschreibung ^
-| Runtime-Lifecycle           | ? Umgesetzt  | FirstRun / OnStart / OnStop über RSEV.Utilities |
-| Konfiguration (config.toml) | ? Umgesetzt  | Automatisches Erstellen + Laden in RSEV.Utilities-Config-Register |
-| Logging                     | ? Umgesetzt  | SystemLog schreibt latest.log im Basisverzeichnis |
-| SemanticStateMatrix         | ? Umgesetzt  | Objektbaum, States, History, Embeddings, Vektorindex, Snapshot-Persistenz |
-| SystemBus (BusFrame)        | ? Umgesetzt  | Publish/Subscribe über RSEV.Utilities.Messaging |
-| AdapterRouter                | ? Umgesetzt  | Custom ? intern, IoBroker ? TCP-Bridge (seit Sprint 2 aktiv) |
-| TCP-Bridge                  | ? Umgesetzt  | Framing-Protokoll, Handshake, Host?Adapter & Adapter?Host Transport |
-| AdapterRegistry              | ? Umgesetzt  | Name/Id/Type/Status/TcpEndpoint, automatische ID-Vergabe "Name.id" |
-| Node.js-Adapter-Runtime      | ? Umgesetzt  | Isolierte Prozesse über RSEV.Utilities.Processes, Crash-Recovery, Heartbeat |
-| CustomAdapter-API (IAdapter) | ? Offen      | Geplant für Sprint 3 |
-| AdminUI                     | ? Offen      | Geplant für Sprint 5 |
-| Adapter-Migrationen         | ? Offen      | Geplant ab Sprint 7 |
+===== Dokumentation =====
 
-Legende: ? fertig · ?? teilweise/Skeleton · ? noch nicht begonnen
+  * [[architektur|ArchitekturÃ¼bersicht]]
+  * [[core-matrix|Core/Matrix â€“ Semantische Zustandsmatrix]]
+  * [[core-bus|Core/Bus â€“ Systembus]]
+  * [[core-routing|Core/Routing â€“ AdapterRouter]]
+  * [[core-bridge|Core/Bridge â€“ TCP-Bridge & Node.js-Adapter-Runtime]]
+  * [[core-registry|Core/Registry â€“ AdapterRegistry]]
+  * [[konfiguration|Konfiguration (config.toml)]]
+  * [[sprintplan|Sprintplan & Roadmap]]
+  * [[developer-guide|Developer Guide]]
+  * [[adapter-sdk|Adapter SDK]]
+  * [[migration|Adaptermigration]]

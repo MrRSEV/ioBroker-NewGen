@@ -1,84 +1,34 @@
-====== Core/Bus – Systembus ======
+====== Core/Bus â€“ Systembus ======
 
 Namespace: ''ioBroker_NewGen.Core.Bus''
 
-Der Systembus ist der zentrale, neutrale Datenbus des Systems. Er transportiert
-Payloads (''BusFrame''), ohne den konkreten Adaptertyp zu kennen – die
-Routing-Entscheidung (intern vs. TCP-Bridge) trifft ausschließlich der
-''AdapterRouter'' (siehe [[core-routing]]).
+Der Systembus transportiert ''BusFrame''-Payloads neutral zwischen Adaptern,
+Bridge und Matrix. Die Publish-/Subscribe-Infrastruktur stammt aus
+RSEV.Utilities 3.0.0 ''EventRegistry<T>''; der Projektcode implementiert keine
+eigene EventRegistry.
 
 ===== BusFrame =====
 
-<code csharp>
-public sealed record BusFrame(
-    string AdapterId,
-    string Address,
-    ReadOnlyMemory<byte> Payload,
-    string ValueType,
-    BusFrameKind Kind,
-    DateTime Timestamp,
-    BusFrameMetadata Metadata
-);
-</code>
-
-^ Feld         ^ Beschreibung ^
-| AdapterId    | ID des sendenden/zugehörigen Adapters, Format "Name.id" (siehe TCP-Bridge-Handshake) |
-| Address      | Logische Zieladresse, z. B. eine State-ID ("temp.livingroom") |
-| Payload      | Rohdaten des Frames (ReadOnlyMemory<byte>) |
-| ValueType    | Typbezeichnung des Payloads (z. B. "double", "bool", "json") |
-| Kind         | Art des Frames (siehe BusFrameKind) |
-| Timestamp    | Erzeugungszeitpunkt (UTC) |
-| Metadata     | Zusätzliche, optionale Metadaten (Key/Value) |
-
-Factory-Methode für den Alltagsgebrauch:
-
-<code csharp>
-BusFrame.Create(adapterId, address, payload, valueType, kind, metadata?);
-// setzt Timestamp = DateTime.UtcNow und Metadata = BusFrameMetadata.Empty (falls null)
-</code>
-
-==== BusFrameKind ====
-
-<code csharp>
-public enum BusFrameKind
-{
-    Raw,          // unspezifizierte Rohdaten
-    StateUpdate,  // State-Wert-Änderung
-    Command,      // Befehl an einen Adapter
-    Event         // Ereignis-Benachrichtigung
-}
-</code>
-
-==== BusFrameMetadata ====
-
-Beliebige Schlüssel-Wert-Paare, z. B. für Korrelations-IDs oder Reply-Adressen.
-''BusFrameMetadata.Empty'' liefert eine leere Standardinstanz.
+  * ''AdapterId'': Sender oder Ziel im Format ''Name.id''
+  * ''Address'': logische State-/Topic-Adresse
+  * ''Payload'': Rohdaten als ''ReadOnlyMemory<byte>''
+  * ''ValueType'': Payloadtyp wie ''double'', ''bool'', ''json'' oder ''raw''
+  * ''Kind'': ''Raw'', ''StateUpdate'', ''Command'' oder ''Event''
+  * ''Timestamp'': UTC-Zeitpunkt
+  * ''Metadata'': optionale Key/Value-Daten
 
 ===== SystemMessageBus =====
 
-''SystemMessageBus'' erbt von ''RSEV.Utilities.Messaging.BaseMessageBus'' und
-übernimmt dessen Lifecycle-Grundgerüst (''Initialize''/''InitializeAsync'',
-''Shutdown''/''ShutdownAsync'', ''Name'', ''Description''). Zusätzlich implementiert
-die Klasse ein eigenes, thread-sicheres Publish/Subscribe-Modell für
-''BusFrame''-Objekte:
+''SystemMessageBus'' erbt von RSEV.Utilities ''BaseMessageBus'' und delegiert
+Frames an eine RSEV-''EventRegistry<BusFrame>''. Die vorhandene
+Adress-KompatibilitÃ¤ts-API unterstÃ¼tzt konkrete Adressen und ''*'' als Wildcard.
 
-^ Methode                                           ^ Beschreibung ^
-| ''Publish(BusFrame frame)''                        | Benachrichtigt alle Subscriber der Adresse + alle Wildcard-Subscriber ("*") |
-| ''Subscribe(string address, Action<BusFrame>)''    | Registriert Callback für eine Adresse (oder "*" für alle Frames) |
-| ''Unsubscribe(string address, Action<BusFrame>)''  | Entfernt Callback |
+===== Datenfluss =====
 
-Subscriber-Fehler werden abgefangen und über den RuntimeContext-Logger
-protokolliert, um die Bus-Stabilität nicht zu gefährden.
+  - Ein Adapter erzeugt einen ''BusFrame''.
+  - Der ''AdapterRouter'' entscheidet intern oder TCP-Bridge.
+  - ''StateUpdate''-Frames werden von der Matrix dekodiert und als State
+    gespeichert.
+  - ''Command''-Frames werden an den Zieladapter weitergeleitet.
 
-===== Registrierung =====
-
-Der ''SystemMessageBus'' wird beim Systemstart in ''MainRuntimeContext'' erzeugt,
-über ''MessageBusRegistry.Register(...)'' (RSEV.Utilities) registriert und per
-''Initialize(this)'' initialisiert (siehe ''InitializeMatrixAndBus'').
-
-===== Zusammenspiel mit der Matrix =====
-
-Aktuell sind ''SemanticStateMatrix'' und ''SystemMessageBus'' unabhängige
-Bausteine (lose gekoppelt). Die Verbindung "BusFrame ? SetState" bzw.
-"SetState ? BusFrame-Publish" ist für einen späteren Sprint vorgesehen,
-sobald konkrete Adapter (Custom/ioBroker) Payloads produzieren bzw. konsumieren.
+Subscriber-Fehler werden geloggt und beenden den Bus nicht.

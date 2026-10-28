@@ -6,6 +6,11 @@ using ioBroker_NewGen.Core.Bus;
 using ioBroker_NewGen.Core.Routing;
 using ioBroker_NewGen.Core.Registry;
 using ioBroker_NewGen.Core.Bridge;
+using ioBroker_NewGen.Core.Adapters;
+using ioBroker_NewGen.Core.Events;
+using ioBroker_NewGen.Core.Deployment;
+using ioBroker_NewGen.Core.Backup;
+using RSEV.Utilities.Events;
 
 namespace ioBroker_NewGen.Controllers
 {
@@ -20,7 +25,7 @@ namespace ioBroker_NewGen.Controllers
         private static readonly Lazy<MainRuntimeContext> _instance = new(() => new MainRuntimeContext());
 
         /// <summary>
-        /// Die einzige Instanz des MainRuntimeContext für den gesamten Prozess.
+        /// Die einzige Instanz des MainRuntimeContext fï¿½r den gesamten Prozess.
         /// </summary>
         public static MainRuntimeContext Instance => _instance.Value;
 
@@ -37,7 +42,12 @@ namespace ioBroker_NewGen.Controllers
         public SystemMessageBus SystemBus { get; private set; } = null!;
 
         /// <summary>
-        /// Entscheidet, ob Frames intern (Custom-Adapter) oder über die
+        /// RSEV.Utilities-basierter EventBus fÃ¼r State- und Adapterereignisse.
+        /// </summary>
+        public SystemEventBus SystemEventBus { get; private set; } = null!;
+
+        /// <summary>
+        /// Entscheidet, ob Frames intern (Custom-Adapter) oder ï¿½ber die
         /// TCP-Bridge (ioBroker-Legacy-Adapter) geroutet werden.
         /// </summary>
         public AdapterRouter AdapterRouter { get; private set; } = null!;
@@ -49,7 +59,7 @@ namespace ioBroker_NewGen.Controllers
         public AdapterRegistry AdapterRegistry { get; private set; } = null!;
 
         /// <summary>
-        /// TCP-Bridge-Server für isolierte Legacy-ioBroker-Adapter (Node.js-Prozesse).
+        /// TCP-Bridge-Server fï¿½r isolierte Legacy-ioBroker-Adapter (Node.js-Prozesse).
         /// </summary>
         public TcpBridgeServer? TcpBridge { get; private set; }
 
@@ -57,6 +67,22 @@ namespace ioBroker_NewGen.Controllers
         /// Verwaltet isolierte Node.js-Adapterprozesse (Start, Crash-Recovery, Heartbeat).
         /// </summary>
         public NodeAdapterRuntime? NodeRuntime { get; private set; }
+
+        /// <summary>
+        /// Runtime fÃ¼r host-interne C#-Adapter.
+        /// </summary>
+        public CustomAdapterRuntime? CustomAdapterRuntime { get; private set; }
+
+        public AdapterInstaller? AdapterInstaller { get; private set; }
+
+        public AdapterPackageInstaller? AdapterPackageInstaller { get; private set; }
+
+        public AdapterRepositoryClient? AdapterRepositoryClient { get; private set; }
+
+        public BackupService? BackupService { get; private set; }
+
+        private bool _matrixBusWired;
+        private AdapterLifecycleLogHandler? _adapterLifecycleLogHandler;
 
         private MainRuntimeContext()
         {
@@ -68,8 +94,6 @@ namespace ioBroker_NewGen.Controllers
         /// </summary>
         public void InitializeMatrixAndBus(string snapshotPath)
         {
-            Matrix ??= new SemanticStateMatrix(snapshotPath);
-
             if (SystemBus is null)
             {
                 SystemBus = new SystemMessageBus();
@@ -77,24 +101,53 @@ namespace ioBroker_NewGen.Controllers
                 SystemBus.Initialize(this);
             }
 
+            if (SystemEventBus is null)
+            {
+                SystemEventBus = new SystemEventBus();
+                MessageBusRegistry.Register(SystemEventBus);
+                SystemEventBus.Initialize(this);
+            }
+
+            if (_adapterLifecycleLogHandler is null)
+            {
+                _adapterLifecycleLogHandler = new AdapterLifecycleLogHandler(Logger);
+                SystemEventBus.AdapterLifecycle.Subscribe(_adapterLifecycleLogHandler);
+            }
+
+            var roleStorePath = Path.Combine(
+                Path.GetDirectoryName(Path.GetFullPath(snapshotPath)) ?? AppContext.BaseDirectory,
+                "roles.json");
+            Matrix ??= new SemanticStateMatrix(
+                snapshotPath,
+                roleService: new DefaultRoleService(roleStorePath),
+                eventBus: SystemEventBus);
+
             AdapterRouter ??= new AdapterRouter(SystemBus, Logger);
-            AdapterRegistry ??= new AdapterRegistry();
+            AdapterRegistry ??= new AdapterRegistry(SystemEventBus);
+
+            if (!_matrixBusWired)
+            {
+                // Sprint-1-Datenpfad: StateUpdate-Frames werden Ã¼ber den
+                // RSEV.Utilities-basierten SystemBus in die Matrix Ã¼bernommen.
+                SystemBus.Subscribe("*", frame => Matrix.ApplyFrame(frame));
+                _matrixBusWired = true;
+            }
         }
 
         /// <summary>
-        /// Startet die TCP-Bridge (Sprint 2) auf dem übergebenen Port und
-        /// verknüpft sie mit dem <see cref="AdapterRouter"/>, sodass Frames
-        /// für <see cref="AdapterType.IoBroker"/> tatsächlich zugestellt werden.
+        /// Startet die TCP-Bridge (Sprint 2) auf dem ï¿½bergebenen Port und
+        /// verknï¿½pft sie mit dem <see cref="AdapterRouter"/>, sodass Frames
+        /// fï¿½r <see cref="AdapterType.IoBroker"/> tatsï¿½chlich zugestellt werden.
         /// Erwartet, dass <see cref="InitializeMatrixAndBus"/> zuvor aufgerufen wurde.
         /// </summary>
-        public async Task StartTcpBridgeAsync(int port)
+        public async Task StartTcpBridgeAsync(int port, string bindHost = "127.0.0.1")
         {
             if (TcpBridge is not null)
             {
                 return;
             }
 
-            TcpBridge = new TcpBridgeServer(port, AdapterRegistry, SystemBus, Logger);
+            TcpBridge = new TcpBridgeServer(port, bindHost, AdapterRegistry, SystemBus, Logger);
             await TcpBridge.StartAsync();
             AdapterRouter.AttachTcpBridge(TcpBridge);
         }
@@ -102,12 +155,70 @@ namespace ioBroker_NewGen.Controllers
         /// <summary>
         /// Initialisiert die Node.js-Adapter-Runtime (Sprint 2) auf Basis von
         /// <see cref="RSEV.Utilities.Processes.RuntimeProcessController"/> (aus <see cref="ProcessController"/>)
-        /// und startet die periodische Health-Überwachung/Crash-Recovery.
+        /// und startet die periodische Health-ï¿½berwachung/Crash-Recovery.
         /// </summary>
-        public void InitializeNodeRuntime()
+        public void InitializeNodeRuntime(
+            TimeSpan? crashRestartDelay = null,
+            TimeSpan? healthCheckInterval = null)
         {
-            NodeRuntime ??= new NodeAdapterRuntime(ProcessController, AdapterRegistry, Logger);
+            NodeRuntime ??= new NodeAdapterRuntime(
+                ProcessController,
+                AdapterRegistry,
+                Logger,
+                crashRestartDelay,
+                healthCheckInterval);
             NodeRuntime.StartHealthMonitoring();
+        }
+
+        /// <summary>
+        /// Initialisiert die CustomAdapter-Runtime auf Basis des RSEV.Utilities-
+        /// AssemblyLoaders.
+        /// </summary>
+        public void InitializeCustomAdapterRuntime()
+        {
+            CustomAdapterRuntime ??= new CustomAdapterRuntime(
+                AssemblyLoader,
+                Matrix,
+                SystemBus,
+                AdapterRouter,
+                AdapterRegistry,
+                Logger,
+                this,
+                AdapterInstaller,
+                AdapterPackageInstaller,
+                AdapterRepositoryClient);
+        }
+
+        public void InitializeAdapterDeployment(string rootPath)
+        {
+            AdapterInstaller ??= new AdapterInstaller(rootPath);
+            AdapterInstaller.EnsureLayout();
+            AdapterPackageInstaller ??= new AdapterPackageInstaller(AdapterInstaller);
+
+            var requireSignature = false;
+            string? trustedPublicKeyPem = null;
+            try
+            {
+                requireSignature = Config.Get<bool>("adapter.requireSignedPackages");
+                trustedPublicKeyPem = Config.Get<string>("adapter.trustedPackagePublicKeyPem");
+            }
+            catch
+            {
+                // Ã„ltere Konfigurationen behalten den kompatiblen optionalen Signaturmodus.
+            }
+
+            AdapterRepositoryClient ??= new AdapterRepositoryClient(
+                AdapterPackageInstaller,
+                securityOptions: new AdapterRepositorySecurityOptions
+                {
+                    RequireSignature = requireSignature,
+                    TrustedPublicKeyPem = trustedPublicKeyPem
+                });
+        }
+
+        public void InitializeBackupService()
+        {
+            BackupService ??= new BackupService(AppContext.BaseDirectory);
         }
 
         /// <summary>
@@ -115,6 +226,11 @@ namespace ioBroker_NewGen.Controllers
         /// </summary>
         public async Task ShutdownBridgeAndNodeRuntimeAsync()
         {
+            if (CustomAdapterRuntime is not null)
+            {
+                await CustomAdapterRuntime.DisposeAsync();
+            }
+
             if (NodeRuntime is not null)
             {
                 await NodeRuntime.StopAllAsync();
@@ -126,9 +242,22 @@ namespace ioBroker_NewGen.Controllers
             }
         }
 
+        public void ShutdownInfrastructure()
+        {
+            if (SystemEventBus is not null)
+            {
+                SystemEventBus.Shutdown(this);
+            }
+
+            if (SystemBus is not null)
+            {
+                SystemBus.Shutdown(this);
+            }
+        }
+
         /// <summary>
         /// Erstellt das Konfigurationsregister des RSEV.Utilities-Frameworks.
-        /// Die Instanz wird von BaseRuntimeContext während der Initialisierung
+        /// Die Instanz wird von BaseRuntimeContext wï¿½hrend der Initialisierung
         /// dieses RuntimeContext registriert.
         /// </summary>
         protected override IConfig CreateDefaultConfig()
@@ -144,6 +273,35 @@ namespace ioBroker_NewGen.Controllers
             var logger = new SystemLog(AppContext.BaseDirectory);
             logger.Init();
             return logger;
+        }
+
+        private sealed class AdapterLifecycleLogHandler : BaseEventHandler<AdapterLifecycleEventArgs>
+        {
+            private readonly ILogger _logger;
+
+            public AdapterLifecycleLogHandler(ILogger logger)
+            {
+                _logger = logger;
+            }
+
+            protected override void OnHandle(object sender, AdapterLifecycleEventArgs args)
+            {
+                var adapter = args.Registration;
+                var description = $"Adapter '{adapter.Name}' (ID: {adapter.Id}, Typ: {adapter.Type})";
+
+                switch (adapter.Status)
+                {
+                    case AdapterStatus.Connected:
+                        _logger.LogInfo($"{description} gestartet.");
+                        break;
+                    case AdapterStatus.Disconnected when args.PreviousStatus == AdapterStatus.Connected:
+                        _logger.LogInfo($"{description} gestoppt.");
+                        break;
+                    case AdapterStatus.Faulted:
+                        _logger.LogError($"{description} ist in einen Fehlerzustand gewechselt.");
+                        break;
+                }
+            }
         }
     }
 }

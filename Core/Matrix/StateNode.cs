@@ -1,52 +1,93 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace ioBroker_NewGen.Core.Matrix
 {
     /// <summary>
     /// Aktueller Zustand eines <see cref="MatrixObject"/> inklusive
     /// semantischer Informationen (Embedding) und History.
-    /// Thread-sicher für nebenläufige Lese-/Schreibzugriffe.
+    /// Thread-sicher fï¿½r nebenlï¿½ufige Lese-/Schreibzugriffe.
     /// </summary>
     public sealed class StateNode
     {
         private readonly object _valueLock = new();
         private readonly int _maxInMemoryHistory;
+        private object? _value;
+        private DateTime _timestamp;
+        private string? _lastWrittenBy;
+        private float[] _embedding = Array.Empty<float>();
 
         /// <summary>
-        /// Eindeutige ID des Zustands (identisch mit der zugehörigen <see cref="MatrixObject.Id"/>).
+        /// Eindeutige ID des Zustands (identisch mit der zugehï¿½rigen <see cref="MatrixObject.Id"/>).
         /// </summary>
         public string Id { get; }
 
         /// <summary>
         /// Aktueller Wert des Zustands.
         /// </summary>
-        public object? Value { get; private set; }
+        public object? Value
+        {
+            get
+            {
+                lock (_valueLock)
+                {
+                    return _value;
+                }
+            }
+        }
 
         /// <summary>
         /// Zeitstempel der letzten Aktualisierung (UTC).
         /// </summary>
-        public DateTime Timestamp { get; private set; }
+        public DateTime Timestamp
+        {
+            get
+            {
+                lock (_valueLock)
+                {
+                    return _timestamp;
+                }
+            }
+        }
 
         /// <summary>
         /// Letzter Benutzer/Adapter, der den Wert gesetzt hat.
         /// </summary>
-        public string? LastWrittenBy { get; private set; }
+        public string? LastWrittenBy
+        {
+            get
+            {
+                lock (_valueLock)
+                {
+                    return _lastWrittenBy;
+                }
+            }
+        }
 
         /// <summary>
         /// Semantisches Embedding des aktuellen Payloads.
         /// </summary>
-        public float[] Embedding { get; private set; } = Array.Empty<float>();
+        public float[] Embedding
+        {
+            get
+            {
+                lock (_valueLock)
+                {
+                    return _embedding.ToArray();
+                }
+            }
+        }
 
         /// <summary>
-        /// Beliebige zusätzliche Metadaten (Rolle, Einheit, Typ etc.).
+        /// Beliebige zusï¿½tzliche Metadaten (Rolle, Einheit, Typ etc.).
         /// </summary>
         public Dictionary<string, string> Meta { get; init; } = new();
 
         /// <summary>
-        /// In-Memory-Verlauf der letzten Werte (begrenzt). Die vollständige
-        /// History wird über die Snapshot-Datei persistiert.
+        /// In-Memory-Verlauf der letzten Werte (begrenzt). Die vollstï¿½ndige
+        /// History wird ï¿½ber die Snapshot-Datei persistiert.
         /// </summary>
         public ConcurrentQueue<HistorySample> History { get; } = new();
 
@@ -54,28 +95,32 @@ namespace ioBroker_NewGen.Core.Matrix
         {
             Id = id;
             _maxInMemoryHistory = maxInMemoryHistory;
-            Timestamp = DateTime.UtcNow;
+            _timestamp = DateTime.UtcNow;
         }
 
         /// <summary>
         /// Aktualisiert Wert, Zeitstempel, Embedding und History thread-sicher.
         /// </summary>
-        internal HistorySample Update(object? value, float[] embedding, string? writtenBy)
+        internal HistorySample Update(
+            object? value,
+            float[] embedding,
+            string? writtenBy,
+            DateTime? timestamp = null)
         {
             lock (_valueLock)
             {
-                Value = value;
-                Embedding = embedding;
-                Timestamp = DateTime.UtcNow;
-                LastWrittenBy = writtenBy;
+                _value = value;
+                _embedding = embedding?.ToArray() ?? Array.Empty<float>();
+                _timestamp = timestamp ?? DateTime.UtcNow;
+                _lastWrittenBy = writtenBy;
 
-                var sample = new HistorySample(Id, Timestamp, value, embedding);
+                var sample = new HistorySample(Id, _timestamp, value, _embedding.ToArray());
                 History.Enqueue(sample);
 
                 while (History.Count > _maxInMemoryHistory && History.TryDequeue(out _))
                 {
-                    // Älteste In-Memory-Einträge verwerfen; die vollständige
-                    // History bleibt über den Snapshot erhalten.
+                    // ï¿½lteste In-Memory-Eintrï¿½ge verwerfen; die vollstï¿½ndige
+                    // History bleibt ï¿½ber den Snapshot erhalten.
                 }
 
                 return sample;
@@ -84,22 +129,22 @@ namespace ioBroker_NewGen.Core.Matrix
 
         /// <summary>
         /// Stellt einen State aus einem geladenen Snapshot wieder her,
-        /// ohne eine neue History-Sample-Erzeugung auszulösen.
+        /// ohne eine neue History-Sample-Erzeugung auszulï¿½sen.
         /// </summary>
         internal void Restore(object? value, DateTime timestamp, float[] embedding, string? writtenBy)
         {
             lock (_valueLock)
             {
-                Value = value;
-                Timestamp = timestamp;
-                Embedding = embedding;
-                LastWrittenBy = writtenBy;
+                _value = value;
+                _timestamp = timestamp;
+                _embedding = embedding?.ToArray() ?? Array.Empty<float>();
+                _lastWrittenBy = writtenBy;
             }
         }
 
         /// <summary>
-        /// Fügt eine aus dem Snapshot rekonstruierte History-Sample direkt hinzu,
-        /// ohne den aktuellen Wert zu verändern.
+        /// Fï¿½gt eine aus dem Snapshot rekonstruierte History-Sample direkt hinzu,
+        /// ohne den aktuellen Wert zu verï¿½ndern.
         /// </summary>
         internal void AppendHistorySample(HistorySample sample)
         {

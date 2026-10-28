@@ -5,7 +5,7 @@ using ioBroker_NewGen.Core.Routing;
 namespace ioBroker_NewGen.Core.Registry
 {
     /// <summary>
-    /// Registrierter Eintrag für einen Adapter (Custom oder ioBroker-Legacy).
+    /// Registrierter Eintrag fï¿½r einen Adapter (Custom oder ioBroker-Legacy).
     /// Wird von der <see cref="AdapterRegistry"/> verwaltet.
     /// </summary>
     public sealed class AdapterRegistration
@@ -31,19 +31,19 @@ namespace ioBroker_NewGen.Core.Registry
         public AdapterStatus Status { get; set; } = AdapterStatus.Created;
 
         /// <summary>
-        /// Beliebige zusätzliche Metadaten (z. B. Version, Hersteller, Node.js-Skriptpfad).
+        /// Beliebige zusï¿½tzliche Metadaten (z. B. Version, Hersteller, Node.js-Skriptpfad).
         /// </summary>
         public Dictionary<string, string> Metadata { get; init; } = new();
 
         /// <summary>
-        /// TCP-Endpunkt des Adapters (nur für <see cref="AdapterType.IoBroker"/> relevant,
-        /// sobald die Verbindung über die TCP-Bridge aufgebaut wurde).
+        /// TCP-Endpunkt des Adapters (nur fï¿½r <see cref="AdapterType.IoBroker"/> relevant,
+        /// sobald die Verbindung ï¿½ber die TCP-Bridge aufgebaut wurde).
         /// </summary>
         public string? TcpEndpoint { get; set; }
 
         /// <summary>
-        /// Referenz auf die laufende Instanz (nur für <see cref="AdapterType.Custom"/> relevant,
-        /// z. B. das geladene Plugin-/Assembly-Objekt – wird in Sprint 3 scharf geschaltet).
+        /// Referenz auf die laufende Instanz (nur fï¿½r <see cref="AdapterType.Custom"/> relevant,
+        /// z. B. das geladene Plugin-/Assembly-Objekt ï¿½ wird in Sprint 3 scharf geschaltet).
         /// </summary>
         public object? InstanceReference { get; set; }
 

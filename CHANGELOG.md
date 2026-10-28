@@ -18,42 +18,42 @@ and this project loosely adheres to [Semantic Versioning](https://semver.org/).
 
 ## [0.2.0] - 2026-10-05
 
-### Hinzugef�gt
-- **Core/Bridge** � TCP-Bridge & Node.js-Adapter-Runtime (Sprint 2):
+### Hinzugefügt
+- **Core/Bridge** – TCP-Bridge & Node.js-Adapter-Runtime (Sprint 2):
   - `BridgeMessageType` (Handshake, HandshakeAck, Frame, Heartbeat, Error) und `BridgeEnvelope` als kompaktes JSON-Transport-Format.
-  - `BridgeProtocol` � Framing mit 4-Byte-L�ngenpr�fix �ber `NetworkStream`, verhindert Nachrichtenfragmentierung.
-  - `BridgeConnection` � kapselt eine einzelne TCP-Verbindung, serialisiert Schreibzugriffe.
-  - `TcpBridgeServer` � TCP-Listener mit Handshake (Adapter sendet Namen, Host vergibt ID im Format `Name.id`), bidirektionaler Frame-Transport; eingehende Payloads werden 1:1 auf den `SystemMessageBus` gespiegelt.
-  - `NodeAdapterRuntime` � verwaltet isolierte Node.js-Adapterprozesse auf Basis von `RSEV.Utilities.Processes` (`NodeProcess`, `RuntimeProcessController`), inklusive automatischem Crash-Recovery (periodischer Health-Check + Neustart) und Heartbeat-Monitoring.
-- **Core/Registry** � `AdapterRegistry`, `AdapterRegistration`, `AdapterStatus`:
+  - `BridgeProtocol` – Framing mit 4-Byte-Längenpräfix über `NetworkStream`, verhindert Nachrichtenfragmentierung.
+  - `BridgeConnection` – kapselt eine einzelne TCP-Verbindung, serialisiert Schreibzugriffe.
+  - `TcpBridgeServer` – TCP-Listener mit Handshake (Adapter sendet Namen, Host vergibt ID im Format `Name.id`), bidirektionaler Frame-Transport; eingehende Payloads werden 1:1 auf den `SystemMessageBus` gespiegelt.
+  - `NodeAdapterRuntime` – verwaltet isolierte Node.js-Adapterprozesse auf Basis von `RSEV.Utilities.Processes` (`NodeProcess`, `RuntimeProcessController`), inklusive automatischem Crash-Recovery (periodischer Health-Check + Neustart) und Heartbeat-Monitoring.
+- **Core/Registry** – `AdapterRegistry`, `AdapterRegistration`, `AdapterStatus`:
   - Thread-sichere zentrale Verwaltung aller Adapter (Custom + ioBroker-Legacy).
   - Automatische, eindeutige ID-Vergabe im Format `Name.id` (z. B. `mqtt.0`, `mqtt.1`).
   - Felder: Name, Id, Type, Status, Metadata, TcpEndpoint (ioBroker), InstanceReference (Custom, ab Sprint 3).
-- `AdapterRouter` erweitert um `AttachTcpBridge(...)`: `IoBroker`-Frames werden nun tats�chlich �ber die TCP-Bridge an den adressierten Adapter zugestellt, statt nur geloggt zu werden (Sprint-1-Fallback).
+- `AdapterRouter` erweitert um `AttachTcpBridge(...)`: `IoBroker`-Frames werden nun tatsächlich über die TCP-Bridge an den adressierten Adapter zugestellt, statt nur geloggt zu werden (Sprint-1-Fallback).
 - `MainRuntimeContext` erweitert um `AdapterRegistry`, `TcpBridge`, `NodeRuntime` sowie die Methoden `StartTcpBridgeAsync`, `InitializeNodeRuntime`, `ShutdownBridgeAndNodeRuntimeAsync`.
-- `OnStart`/`OnStop` integrieren den Lifecycle von TCP-Bridge und Node.js-Adapter-Runtime (Port aus `config.toml` ? `ipc.ipcPort`, Fallback 5001).
+- `OnStart`/`OnStop` integrieren den Lifecycle von TCP-Bridge und Node.js-Adapter-Runtime (Port aus `config.toml` → `ipc.ipcPort`, Fallback 5001).
 - DokuWiki-Dokumentation unter `Doku/` erweitert um `core-bridge.txt`, `core-registry.txt`; `architektur.txt`, `core-routing.txt`, `runtime-lifecycle.txt`, `sprintplan.txt`, `start.txt` aktualisiert.
 
 ## [0.1.0] - 2026-10-05
 
-### Added
-- Basic framework of the runtime lifecycle (`FirstRun`, `OnStart`, `OnStop`) based on RSEV.Utilities.
-- `MainRuntimeContext` as an application-wide singleton `RuntimeContext`, including its own logger (`SystemLog`, writes `latest.log` into the base directory) and configuration registry (`ConfConfig`).
-- `ConfigCreator` for automatically creating a default `config.toml` on first startup.
-- `ConfigLoader` for loading `config.toml` into the RSEV.Utilities configuration registry during system startup, including automatic resetting of `firstrun` to `false`.
-- `UnexpectedUserExitHandler` for clean handling of CTRL+C, console-close events, and Windows shutdown/logoff events with guaranteed invocation of `OnStop`.
-- **Core/Matrix** – Semantic state and reference matrix (`SemanticStateMatrix`):
-  - `MatrixObject`, `StateNode`, `HistorySample` as core models of the object tree.
-  - `IEmbeddingService` / `HashingEmbeddingService` for deterministic semantic embeddings.
-  - `IVectorIndex` / `VectorIndex` for semantic similarity search (cosine similarity).
-  - `IRoleService` / `DefaultRoleService` for read/write permissions per user and state.
-  - Full JSONL snapshot persistence (`LoadSnapshotAsync`, `WriteSnapshotAsync`, periodic `StartCronSnapshot`).
+### Hinzugefügt
+- Grundgerüst des Runtime-Lifecycles (`FirstRun`, `OnStart`, `OnStop`) auf Basis von RSEV.Utilities.
+- `MainRuntimeContext` als applikationsweiter Singleton-`RuntimeContext` inkl. eigenem Logger (`SystemLog`, schreibt `latest.log` in das Basisverzeichnis) und Konfigurationsregister (`ConfConfig`).
+- `ConfigCreator` zum automatischen Anlegen einer Standard-`config.toml` beim Erststart.
+- `ConfigLoader` zum Einlesen der `config.toml` in das RSEV.Utilities-Konfigurationsregister beim Systemstart, inklusive automatischem Zurücksetzen von `firstrun` auf `false`.
+- `UnexpectedUserExitHandler` zur sauberen Behandlung von CTRL+C, Konsolen-Schließen sowie Windows-Shutdown-/Logoff-Events mit garantiertem `OnStop`-Aufruf.
+- **Core/Matrix** – Semantische Zustands- und Referenzmatrix (`SemanticStateMatrix`):
+  - `MatrixObject`, `StateNode`, `HistorySample` als Kernmodelle des Objektbaums.
+  - `IEmbeddingService` / `HashingEmbeddingService` für deterministische semantische Embeddings.
+  - `IVectorIndex` / `VectorIndex` für semantische Ähnlichkeitssuche (Kosinus-Similarity).
+  - `IRoleService` / `DefaultRoleService` für Lese-/Schreibrechte pro Benutzer und State.
+  - Vollständige JSONL-Snapshot-Persistenz (`LoadSnapshotAsync`, `WriteSnapshotAsync`, periodischer `StartCronSnapshot`).
   - API: `RegisterObject`, `GetObject`, `GetState`, `SetState`, `Subscribe`/`Unsubscribe`, `SemanticQuery`, `GetHistory`, `DisplayAsJson`.
-- **Core/Bus** – Central neutral system bus:
-  - `BusFrame` record (AdapterId, Address, Payload, ValueType, Kind, Timestamp, Metadata).
-  - `SystemMessageBus` (based on `RSEV.Utilities.Messaging.BaseMessageBus`) with thread‑safe publish/subscribe including wildcard subscriptions.
-- **Core/Routing** – `AdapterRouter` skeleton to distinguish between internal routing (`CustomAdapter`) and TCP‑bridge routing (`IoBrokerAdapter`, coming in a later version).
-- Registration of `SemanticStateMatrix`, `SystemMessageBus`, and `AdapterRouter` in `MainRuntimeContext`, initialization during system startup, and automatic writing of the final snapshot during shutdown.
+- **Core/Bus** – Zentraler neutraler Systembus:
+  - `BusFrame`-Record (AdapterId, Address, Payload, ValueType, Kind, Timestamp, Metadata).
+  - `SystemMessageBus` (basierend auf `RSEV.Utilities.Messaging.BaseMessageBus`) mit thread-sicherem Publish/Subscribe inkl. Wildcard-Abonnements.
+- **Core/Routing** – `AdapterRouter`-Skeleton zur Unterscheidung zwischen internem Routing (`CustomAdapter`) und TCP-Bridge-Routing (`IoBrokerAdapter`, folgt in einer späteren Version).
+- Registrierung von `SemanticStateMatrix`, `SystemMessageBus` und `AdapterRouter` im `MainRuntimeContext`, Initialisierung beim Systemstart sowie automatisches Schreiben des finalen Snapshots beim Herunterfahren.
 
 [0.2.0]: https://github.com/MrRSEV/ioBroker-NewGen/releases/tag/dev-0.2.0
 [0.1.0]: https://github.com/MrRSEV/ioBroker-NewGen/releases/tag/dev-0.1.0

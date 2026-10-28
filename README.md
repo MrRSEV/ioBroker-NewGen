@@ -1,7 +1,7 @@
 # ioBroker-NewGen
 
 > Preview of an emerging project called **ioBroker-NewGen**.  
-> Current status: **beta0.2.0** (Sprint-1-bis-11-Refactoring; Hardware-/Cloud-Abnahmen ausstehend).
+> Current status: **beta0.3.0** (Sprint-1-bis-11-Refactoring; Hardware-/Cloud-Abnahmen ausstehend).
 
 ## Short Description
 
@@ -13,6 +13,10 @@ The goal is a clean separation between core logic, adapter runtime, routing, and
 The runtime uses **RSEV.Utilities 3.0.0.0** as its lifecycle, messaging, event,
 process and assembly-loading infrastructure. AdminUI and all native adapters
 run as separate external assemblies under `Adapters/custom`.
+
+Every adapter start, stop and error state (custom and legacy) is written to the
+log. The admin dashboard is served on the configured `admin.adminPort`
+(default `8080`) at `/`, `/index.html` and `/admin`.
 
 ---
 

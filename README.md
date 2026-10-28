@@ -1,7 +1,7 @@
 # ioBroker-NewGen
 
 > Preview of an emerging project called **ioBroker-NewGen**.  
-> Current status: **beta0.3.0** (Sprint-1-bis-11-Refactoring; Hardware-/Cloud-Abnahmen ausstehend).
+> Current status: **alpha0.3.0** (Sprint-1-bis-11-Refactoring; Hardware-/Cloud-Abnahmen ausstehend).
 
 ## Short Description
 

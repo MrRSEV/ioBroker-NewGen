@@ -56,5 +56,24 @@ namespace ioBroker_NewGen.Core.Registry
         /// Zeitpunkt des letzten Handshakes/Heartbeats (UTC), falls bekannt.
         /// </summary>
         public DateTime? LastSeenAt { get; set; }
+
+        /// <summary>Zeitpunkt des letzten Wechsels auf Connected (UTC).</summary>
+        public DateTime? StartedAt { get; set; }
+
+        /// <summary>Zeitpunkt des letzten Stopps oder Fehlers (UTC).</summary>
+        public DateTime? StoppedAt { get; set; }
+
+        /// <summary>Zeitpunkt des letzten Statuswechsels (UTC).</summary>
+        public DateTime LastStatusChangeAt { get; set; } = DateTime.UtcNow;
+
+        public int StartCount { get; set; }
+
+        public int RestartCount { get; set; }
+
+        public int FaultCount { get; set; }
+
+        public string? LastError { get; set; }
+
+        public DateTime? LastErrorAt { get; set; }
     }
 }

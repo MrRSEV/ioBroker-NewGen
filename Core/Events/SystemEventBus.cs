@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using ioBroker.Core.Security;
 using RSEV.Utilities.Events;
 using RSEV.Utilities.Runtime;
 
@@ -20,6 +21,35 @@ namespace ioBroker_NewGen.Core.Events
             AdapterLifecycle = new EventRegistry<AdapterLifecycleEventArgs>(AdapterLifecycleEventName);
             RegisterEventRegistry(StateChanged);
             RegisterEventRegistry(AdapterLifecycle);
+
+            UserCreated = RegisterSecurity<UserCreatedEvent>("security.user.created");
+            UserDeleted = RegisterSecurity<UserDeletedEvent>("security.user.deleted");
+            UserLogin = RegisterSecurity<UserLoginEvent>("security.user.login");
+            UserLogout = RegisterSecurity<UserLogoutEvent>("security.user.logout");
+            RoleAssigned = RegisterSecurity<RoleAssignedEvent>("security.role.assigned");
+            RoleRemoved = RegisterSecurity<RoleRemovedEvent>("security.role.removed");
+            SecurityBootstrap = RegisterSecurity<SecurityBootstrapCreated>("security.bootstrap.created");
+        }
+
+        public EventRegistry<UserCreatedEvent> UserCreated { get; }
+
+        public EventRegistry<UserDeletedEvent> UserDeleted { get; }
+
+        public EventRegistry<UserLoginEvent> UserLogin { get; }
+
+        public EventRegistry<UserLogoutEvent> UserLogout { get; }
+
+        public EventRegistry<RoleAssignedEvent> RoleAssigned { get; }
+
+        public EventRegistry<RoleRemovedEvent> RoleRemoved { get; }
+
+        public EventRegistry<SecurityBootstrapCreated> SecurityBootstrap { get; }
+
+        private EventRegistry<T> RegisterSecurity<T>(string name) where T : SecurityEventArgs
+        {
+            var registry = new EventRegistry<T>(name);
+            RegisterEventRegistry(registry);
+            return registry;
         }
 
         public EventRegistry<StateChangedEventArgs> StateChanged { get; }

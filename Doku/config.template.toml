@@ -82,6 +82,10 @@ deviceUri = "http://127.0.0.1"
 switchId = 0
 pollIntervalMs = 5000
 
+[localization]
+language = "de_de"
+fallbackLanguage = "en_GB"
+
 [logging]
 logLevel = "info"
 logPath = "/var/newgen/logs"

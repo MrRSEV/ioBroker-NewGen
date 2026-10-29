@@ -149,6 +149,41 @@ namespace ioBroker_NewGen.Core.Adapters
                    await StartAdapterWithDependenciesAsync(resolvedId, new HashSet<string>(StringComparer.Ordinal), cancellationToken);
         }
 
+        private void RegisterAdapterTranslations(IAdapter adapter)
+        {
+            var localization = _adapterContext.Matrix.Localization;
+            if (localization is null)
+            {
+                return;
+            }
+
+            try
+            {
+                foreach (var (language, texts) in adapter.Translations)
+                {
+                    localization.Extend(language, texts);
+                }
+
+                var directory = adapter.LocalizationDirectory;
+                if (string.IsNullOrWhiteSpace(directory))
+                {
+                    var location = adapter.GetType().Assembly.Location;
+                    directory = string.IsNullOrEmpty(location)
+                        ? null
+                        : System.IO.Path.Combine(System.IO.Path.GetDirectoryName(location)!, "Localization");
+                }
+
+                if (directory is not null)
+                {
+                    localization.ExtendFromDirectory(directory);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"[CustomAdapter] Übersetzungen von '{adapter.Id}' konnten nicht geladen werden: {ex.Message}");
+            }
+        }
+
         private string? ResolveAdapterId(string adapterReference)
         {
             if (string.IsNullOrWhiteSpace(adapterReference))
@@ -207,6 +242,7 @@ namespace ioBroker_NewGen.Core.Adapters
             _adapterRegistry.UpdateStatus(adapterId, AdapterStatus.Connecting);
             try
             {
+                RegisterAdapterTranslations(adapter);
                 await adapter.InitializeAsync(_adapterContext, cancellationToken);
                 await adapter.StartAsync(cancellationToken);
                 _adapterRegistry.UpdateStatus(adapterId, AdapterStatus.Connected);
@@ -215,6 +251,7 @@ namespace ioBroker_NewGen.Core.Adapters
             catch (Exception ex)
             {
                 _adapterRegistry.UpdateStatus(adapterId, AdapterStatus.Faulted);
+                _adapterRegistry.RecordError(adapterId, ex.Message);
                 _logger.LogError($"[CustomAdapter] Start von '{adapterId}' fehlgeschlagen: {ex}");
                 visiting.Remove(adapterId);
                 return false;
@@ -308,8 +345,35 @@ namespace ioBroker_NewGen.Core.Adapters
             catch (Exception ex)
             {
                 _adapterRegistry.UpdateStatus(resolvedId, AdapterStatus.Faulted);
+                _adapterRegistry.RecordError(resolvedId, ex.Message);
                 _logger.LogError($"[CustomAdapter] Stop von '{resolvedId}' fehlgeschlagen: {ex}");
                 return false;
+            }
+        }
+
+        /// <summary>Stoppt und startet einen Adapter atomar innerhalb des Lifecycle-Locks.</summary>
+        public async Task<bool> RestartAdapterAsync(string adapterId, CancellationToken cancellationToken = default)
+        {
+            await _lifecycleGate.WaitAsync(cancellationToken);
+            try
+            {
+                var resolvedId = ResolveAdapterId(adapterId);
+                if (resolvedId is null || !await StopAdapterCoreAsync(resolvedId, cancellationToken))
+                {
+                    return false;
+                }
+
+                var started = await StartAdapterCoreAsync(resolvedId, cancellationToken);
+                if (started)
+                {
+                    _adapterRegistry.RecordRestart(resolvedId);
+                }
+
+                return started;
+            }
+            finally
+            {
+                _lifecycleGate.Release();
             }
         }
 

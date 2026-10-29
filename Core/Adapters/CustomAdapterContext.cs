@@ -71,6 +71,11 @@ namespace ioBroker_NewGen.Core.Adapters
             return AdapterRuntime.StopAdapterAsync(adapterId, cancellationToken);
         }
 
+        public Task<bool> RestartAdapterAsync(string adapterId, CancellationToken cancellationToken = default)
+        {
+            return AdapterRuntime.RestartAdapterAsync(adapterId, cancellationToken);
+        }
+
         public void Publish(BusFrame frame)
         {
             ArgumentNullException.ThrowIfNull(frame);

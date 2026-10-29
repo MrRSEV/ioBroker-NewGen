@@ -129,6 +129,15 @@ Fixtures; konkrete CCU-/Cloud-Authentifizierungsabnahmen bleiben offen.
     implementiert; ein produktiver Schlüssel-/Signaturprozess sowie Hardware- und
     Migrationsabnahmen fehlen noch.
 
+===== beta0.3 – Core.Security =====
+
+Details siehe [[core-security]].
+
+  * v1 (umgesetzt): SQLite, Benutzer, Rollen, Rechte, Sitzungen
+  * v1 (offen): AdminUI-Integration (Menü Administration: Users, Roles, Sessions, ApiKeys, AuditLog)
+  * v2: ApiKeys, AuditLog-Auswertung, Passwortrichtlinien, Account-Lockout
+  * v3: JWT, OAuth2, OpenID Connect, LDAP, Active Directory, SSO
+
 ===== Verbindliche Prüfkommandos =====
 
 <code>

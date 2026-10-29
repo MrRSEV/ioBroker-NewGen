@@ -4,14 +4,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <OutputPath>..\bin\$(Configuration)\net9.0\Adapters\custom\</OutputPath>
+    <OutputPath>..\..\bin\$(Configuration)\net9.0\Adapters\custom\</OutputPath>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\ioBroker-NewGen.csproj">
+    <ProjectReference Include="..\..\ioBroker-NewGen.csproj">
       <Private>false</Private>
     </ProjectReference>
     <Reference Include="RSEV.Utilities">
-      <HintPath>..\libs\RSEV.Utilities.dll</HintPath>
+      <HintPath>..\..\libs\RSEV.Utilities.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>

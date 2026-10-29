@@ -18,6 +18,7 @@ namespace ioBroker_NewGen.Startup
             {
                 var snapshotPath = System.IO.Path.Combine(AppContext.BaseDirectory, "snapshot.jsonl");
                 mainContext.InitializeMatrixAndBus(snapshotPath);
+                mainContext.InitializeLocalization();
                 await mainContext.Matrix.LoadSnapshotAsync();
                 mainContext.Matrix.StartCronSnapshot(TimeSpan.FromMinutes(5));
                 rtx.Logger.LogInfo("SemanticStateMatrix, SystemBus und AdapterRouter initialisiert.");
@@ -70,6 +71,7 @@ namespace ioBroker_NewGen.Startup
 
                 mainContext.InitializeAdapterDeployment(adapterRootPath);
                 mainContext.InitializeBackupService();
+                await mainContext.InitializeSecurityAsync();
                 mainContext.InitializeCustomAdapterRuntime();
                 var customAdapterRuntime = mainContext.CustomAdapterRuntime!;
                 var adapterDirectory = rtx.Config.Get<string>("adapter.customAdapterDirectory");
@@ -104,6 +106,7 @@ namespace ioBroker_NewGen.Startup
             {
                 var snapshotPath = System.IO.Path.Combine(AppContext.BaseDirectory, "snapshot.jsonl");
                 mainContext.InitializeMatrixAndBus(snapshotPath);
+                mainContext.InitializeLocalization();
                 mainContext.Matrix.LoadSnapshotAsync().GetAwaiter().GetResult();
                 mainContext.Matrix.StartCronSnapshot(TimeSpan.FromMinutes(5));
                 rtx.Logger.LogInfo("SemanticStateMatrix, SystemBus und AdapterRouter initialisiert.");
@@ -156,6 +159,7 @@ namespace ioBroker_NewGen.Startup
 
                 mainContext.InitializeAdapterDeployment(adapterRootPath);
                 mainContext.InitializeBackupService();
+                mainContext.InitializeSecurityAsync().GetAwaiter().GetResult();
                 mainContext.InitializeCustomAdapterRuntime();
                 var customAdapterRuntime = mainContext.CustomAdapterRuntime!;
                 var adapterDirectory = rtx.Config.Get<string>("adapter.customAdapterDirectory");

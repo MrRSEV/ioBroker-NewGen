@@ -36,6 +36,8 @@ namespace ioBroker_NewGen.Startup
             rtx.Config.Set("adapter.trustedPackagePublicKeyPem", string.Empty);
             rtx.Config.Set("adapter.legacyAutoStart", false);
             rtx.Config.Set("adapter.adapterAutoStart", true);
+            rtx.Config.Set("localization.language", "de_de");
+            rtx.Config.Set("localization.fallbackLanguage", "en_GB");
 
             foreach (var sourceLine in lines)
             {

@@ -26,6 +26,7 @@ Legacy-Runtimes und einer einheitlichen Adapter-API.
   * Sprint 9: Migration Phase 2 – native DLLs, Geräte-Fixtures offen
   * Sprint 10: Migration Phase 3 – native DLLs, Cloud-/CCU-Fixtures offen
   * Sprint 11: Finalisierung – Release-Candidate-Publish verifiziert, produktive Abnahme offen
+  * beta0.3: Core.Security v1 (SQLite, Benutzer, Rollen, Sitzungen) – umgesetzt, AdminUI-Anbindung offen
 
 ===== Dokumentation =====
 
@@ -35,6 +36,8 @@ Legacy-Runtimes und einer einheitlichen Adapter-API.
   * [[core-routing|Core/Routing – AdapterRouter]]
   * [[core-bridge|Core/Bridge – TCP-Bridge & Node.js-Adapter-Runtime]]
   * [[core-registry|Core/Registry – AdapterRegistry]]
+  * [[core-security|Core/Security – Benutzer, Rollen, Sitzungen]]
+  * [[localization|Core/Localization – LocalizationService, Sprachweiche]]
   * [[konfiguration|Konfiguration (config.toml)]]
   * [[sprintplan|Sprintplan & Roadmap]]
   * [[developer-guide|Developer Guide]]

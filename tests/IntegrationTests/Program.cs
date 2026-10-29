@@ -370,6 +370,7 @@ AssertEx.Equal("dependency-base", dependencyOrder[0], "Dependencies müssen vor 
 AssertEx.Equal("dependent", dependencyOrder[1], "Der abhängige Adapter muss nach seiner Dependency starten.");
 dependencyOrder.Clear();
 await customRuntime.StopAllAsync();
+await SecuritySmoke.RunAsync(mainRuntime, tempRoot);
 AssertEx.Equal("dependent", dependencyOrder[0], "Abhängige Adapter müssen vor ihren Dependencies stoppen.");
 AssertEx.Equal("dependency-base", dependencyOrder[1], "Dependencies müssen zuletzt stoppen.");
 

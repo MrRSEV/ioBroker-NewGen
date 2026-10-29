@@ -20,6 +20,8 @@ namespace ioBroker_NewGen.Core.Adapters
 
         IRoleService RoleService => Matrix.RoleService;
 
+        ioBroker_NewGen.Core.Localization.ILocalizationService? Localization => Matrix.Localization;
+
         SystemMessageBus SystemBus { get; }
 
         AdapterRouter Router { get; }
@@ -41,6 +43,23 @@ namespace ioBroker_NewGen.Core.Adapters
         Task<bool> StartAdapterAsync(string adapterId, CancellationToken cancellationToken = default);
 
         Task<bool> StopAdapterAsync(string adapterId, CancellationToken cancellationToken = default);
+
+        /// <summary>Stoppt und startet einen Adapter neu.</summary>
+        async Task<bool> RestartAdapterAsync(string adapterId, CancellationToken cancellationToken = default)
+        {
+            if (!await StopAdapterAsync(adapterId, cancellationToken))
+            {
+                return false;
+            }
+
+            var started = await StartAdapterAsync(adapterId, cancellationToken);
+            if (started)
+            {
+                AdapterRegistry.RecordRestart(adapterId);
+            }
+
+            return started;
+        }
 
         void Publish(BusFrame frame);
 

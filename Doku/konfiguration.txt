@@ -106,6 +106,10 @@ enableStructuredLogging = true
 enableAdapterLogs = true
 adapterLogPath = "/var/newgen/logs/adapters"
 
+[localization]
+language = "de_de"
+fallbackLanguage = "en_GB"
+
 [security]
 allowRemoteControl = false
 remoteControlToken = ""
@@ -115,16 +119,20 @@ sandboxFileAccessPolicy = "restricted"
 sandboxNetworkPolicy = "local-only"
 </code>
 
+**Hinweis:** ''[localization]'' steuert die Sprache der AdminUI und der Matrix, siehe [[localization]].
+
 **Hinweis:** ''statePersistenceMode = "sqlite"'' sowie ''stateFilePath'' sind
 aktuell nur Konfigurationswerte � die tats�chliche State-Persistenz l�uft
 (Stand Sprint 1) �ber die JSONL-Snapshot-Datei der ''SemanticStateMatrix''
 (siehe [[core-matrix]]), nicht �ber SQLite. Eine sp�tere Umsetzung ist m�glich,
 aber noch nicht erfolgt.
 
-Bei aktiviertem ''adminRequireAuthentication'' erzeugt die AdminUI beim ersten
-Start ein zufälliges Token, falls ''adminToken'' leer ist, und schreibt es in
-den Systemlog. API-Aufrufe verwenden entweder ''X-Admin-Token'' oder
-''Authorization: Bearer <token>''.
+Bei aktiviertem ''adminRequireAuthentication'' zeigt die AdminUI eine
+Anmeldemaske (Benutzer/Passwort aus [[core-security]]). Nach dem Login setzt
+der Server automatisch ein Sitzungs-Cookie, ein Token muss nicht mehr eingegeben
+werden. ''adminToken'' ist nur noch ein **optionaler Automations-Token**: bleibt
+er leer, ist er deaktiviert und es wird keiner mehr erzeugt. Ist er gesetzt,
+akzeptiert die API zusätzlich ''X-Admin-Token'' oder ''Authorization: Bearer <token>''.
 
 ===== Laden & Registrierung (ConfigLoader) =====
 

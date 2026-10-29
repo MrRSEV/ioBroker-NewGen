@@ -129,10 +129,46 @@ namespace ioBroker_NewGen.Core.Registry
 
                 if (previousStatus != status)
                 {
+                    var now = DateTime.UtcNow;
+                    registration.LastStatusChangeAt = now;
+                    switch (status)
+                    {
+                        case AdapterStatus.Connected:
+                            registration.StartedAt = now;
+                            registration.StartCount++;
+                            break;
+                        case AdapterStatus.Disconnected:
+                            registration.StoppedAt = now;
+                            break;
+                        case AdapterStatus.Faulted:
+                            registration.StoppedAt = now;
+                            registration.FaultCount++;
+                            break;
+                    }
+
                     _eventBus?.PublishAdapterLifecycle(
                         this,
                         new AdapterLifecycleEventArgs(registration, previousStatus));
                 }
+            }
+        }
+
+        /// <summary>Merkt den letzten Fehler eines Adapters für die Metrikanzeige.</summary>
+        public void RecordError(string id, string message)
+        {
+            if (_adaptersById.TryGetValue(id, out var registration))
+            {
+                registration.LastError = message;
+                registration.LastErrorAt = DateTime.UtcNow;
+            }
+        }
+
+        /// <summary>Zählt einen Neustart eines Adapters.</summary>
+        public void RecordRestart(string id)
+        {
+            if (_adaptersById.TryGetValue(id, out var registration))
+            {
+                registration.RestartCount++;
             }
         }
     }

@@ -74,6 +74,29 @@ namespace ioBroker_NewGen.Core.Matrix
         /// </summary>
         public IRoleService RoleService => _roleService;
 
+        /// <summary>Sprachweiche des Hosts (gesetzt beim Start); steuert Sprache für Namen und Werte.</summary>
+        public ioBroker_NewGen.Core.Localization.ILocalizationService? Localization { get; set; }
+
+        /// <summary>Aktive Sprache (z. B. "de_DE") für semantische Verknüpfung von Payloads und Werten.</summary>
+        public string Language => Localization?.Language ?? "de_DE";
+
+        /// <summary>
+        /// Liefert den State-Wert sprachabhängig: Booleans über <c>value.true</c>/<c>value.false</c>,
+        /// Zahlen und Datum in der Kultur der aktiven Sprache.
+        /// </summary>
+        public string? GetLocalizedValue(string id)
+        {
+            var value = GetState(id)?.Value;
+            var loc = Localization;
+            return value switch
+            {
+                null => null,
+                bool b when loc is not null => loc.Translate(b ? "value.true" : "value.false"),
+                IFormattable f when loc is not null => f.ToString(null, loc.Culture),
+                _ => value.ToString()
+            };
+        }
+
         /// <summary>
         /// Registriert ein Objekt, erzeugt dessen Objekt-Embedding, legt den
         /// zugeh�rigen <see cref="StateNode"/> an und f�gt einen Eintrag zum

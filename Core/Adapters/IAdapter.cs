@@ -25,6 +25,20 @@ namespace ioBroker_NewGen.Core.Adapters
         /// </summary>
         IReadOnlyCollection<string> Dependencies => Array.Empty<string>();
 
+        /// <summary>
+        /// Optionale Übersetzungen des Adapters: Sprachcode (z. B. "de_DE", "en", "fr_FR")
+        /// auf Schlüssel/Text. Sie erweitern die Host-Sprachdateien, überschreiben sie aber nie.
+        /// Empfohlen sind Schlüssel mit Präfix <c>adapter.&lt;name&gt;.</c>.
+        /// </summary>
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> Translations
+            => new Dictionary<string, IReadOnlyDictionary<string, string>>();
+
+        /// <summary>
+        /// Optionaler Ordner mit Sprachdateien (<c>de_DE.json</c>, <c>en_GB.json</c> …).
+        /// Ohne Angabe wird ein Ordner <c>Localization</c> neben der Adapter-Assembly verwendet.
+        /// </summary>
+        string? LocalizationDirectory => null;
+
         Task InitializeAsync(IAdapterContext context, CancellationToken cancellationToken = default);
 
         Task StartAsync(CancellationToken cancellationToken = default);

@@ -5,6 +5,22 @@ All significant changes to this project are documented in this file.
 The format follows the principles of [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project loosely adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.1] - 2026-10-30
+
+### Added
+- `Legacy/AdapterCore`: legacy adapter core emulator and drop-in replacement for the npm package `@iobroker/adapter-core` (version 3.2.3), so unmodified legacy adapters run without js-controller. All communication uses the unchanged `NodeAdapterClient` TCP bridge.
+  - `Adapter` (EventEmitter, constructor and `class extends` pattern) with `ready`, `stateChange`, `objectChange`, `message` and `unload` events, and the properties `name`, `namespace`, `instance`, `adapterDir`, `connected`, `log`, `config`.
+  - State, object and message API (`*Async` promises plus callback variants, `Foreign` variants, `sendTo`, `sendToHost`) mapped to bridge frames (`StateUpdate`, `StateQuery`, `Subscribe`, `ObjectCreate`, `ObjectQuery`, `ObjectExtend`, `ObjectDelete`, `Message`, `HostMessage`, `Log`).
+  - `BridgeStateSynchronizer`: central frame handling, automatic reconnect with backoff and subscription replay, write buffering while disconnected, local state/object caches and event de-duplication.
+  - Logger forwarding to the bridge with console fallback.
+  - `build-package.js` / `npm run pack:package` builds a self-contained, installable tarball (bundles `NodeAdapterClient.js` unchanged).
+  - Tests (`npm test`, fake bridge) and an mqtt-like example adapter.
+- Documentation: README goals and `Legacy/AdapterCore/README.md` (frame mapping, installation).
+
+### Notes
+- `TcpBridgeServer` is unchanged: it does not yet answer query frames; until the host replies (`metadata.reply=true`, same `correlationId`), reads fall back to the local cache after a timeout.
+- No TypeScript typings (`.d.ts`) are shipped.
+
 ## [0.3.0] - 2026-10-28
 
 ### Added

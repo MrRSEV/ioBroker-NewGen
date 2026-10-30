@@ -25,7 +25,7 @@ log. The admin dashboard is served on the configured `admin.adminPort`
 ### Primary Goals
 - Replace the historical ioBroker architecture with a modern C# state matrix  
 - Isolated Node.js runtimes for legacy adapters  
-- Unified adapter API for all adapter types  
+- Drop-in `@iobroker/adapter-core` replacement (`Legacy/AdapterCore`) so unmodified legacy adapters run without js-controller over the TCP bridge  - Unified adapter API for all adapter types  
 - Stable, object‑oriented real‑time state‑sync engine  
 - New admin UI in C#  
 - Long‑term migration of popular ioBroker adapters to C#

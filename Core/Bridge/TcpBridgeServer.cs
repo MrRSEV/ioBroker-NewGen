@@ -194,11 +194,15 @@ namespace ioBroker_NewGen.Core.Bridge
                 }
 
                 var adapterName = handshake.AdapterId;
-                var candidates = _adapterRegistry.GetByType(AdapterType.IoBroker)
+                var ioBrokerAdapters = _adapterRegistry.GetByType(AdapterType.IoBroker);
+                var candidates = ioBrokerAdapters
                     .Where(candidate => string.Equals(candidate.Name, adapterName, StringComparison.OrdinalIgnoreCase))
                     .OrderBy(candidate => candidate.Id, StringComparer.Ordinal)
                     .ToArray();
-                var registration = candidates.FirstOrDefault(candidate =>
+                // Legacy-Adapter melden ihren Namespace ("iot.1") als Namen: dann ist die Instanz eindeutig.
+                var registration = ioBrokerAdapters.FirstOrDefault(candidate =>
+                                      string.Equals(candidate.Id, adapterName, StringComparison.OrdinalIgnoreCase))
+                                  ?? candidates.FirstOrDefault(candidate =>
                                       string.IsNullOrWhiteSpace(candidate.TcpEndpoint) ||
                                       candidate.Status is AdapterStatus.Disconnected or AdapterStatus.Faulted)
                                   ?? (candidates.Length == 1 ? candidates[0] : null)

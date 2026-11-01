@@ -1,4 +1,4 @@
-using System.Net.Http.Headers;
+﻿using System.Net.Http.Headers;
 using System.Text.Json;
 using ioBroker_NewGen.Core.Adapters.Protocol;
 
@@ -28,12 +28,19 @@ namespace ioBroker_NewGen.Adapters.Bosch
 
         public override string Name => "bosch";
 
+        public override ioBroker_NewGen.Core.Adapters.Configuration.AdapterConfigSchema? ConfigSchema => BuildSchema(
+            TextField("baseUri", "Basis-URI", ""),
+            PasswordField("token", "Token"),
+            TextField("itemsPath", "Items-Pfad", "/rest/items"),
+            TextField("statePrefix", "State-Präfix", "bosch"),
+            NumberField("pollIntervalMs", "Abfrageintervall (ms)", 30000));
+
         protected override Task OnInitializeAsync(CancellationToken cancellationToken)
         {
             _baseUri = new Uri(ReadConfig("bosch.baseUri", "http://127.0.0.1"));
             _token = ReadConfig("bosch.token", string.Empty);
             _itemsPath = ReadConfig("bosch.itemsPath", "/rest/items");
-            _statePrefix = ReadConfig("bosch.statePrefix", "bosch");
+            _statePrefix = ResolvePrefix(ReadConfig("bosch.statePrefix", "bosch"), "bosch");
             PollInterval = TimeSpan.FromMilliseconds(Math.Max(1000, ReadConfig("bosch.pollIntervalMs", 30000)));
             return Task.CompletedTask;
         }

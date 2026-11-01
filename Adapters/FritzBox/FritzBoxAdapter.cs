@@ -1,4 +1,4 @@
-using System.Net.Http.Headers;
+﻿using System.Net.Http.Headers;
 using System.Text;
 using System.Xml.Linq;
 using ioBroker_NewGen.Core.Adapters.Protocol;
@@ -31,13 +31,21 @@ namespace ioBroker_NewGen.Adapters.FritzBox
 
         public override string Name => "fritzbox";
 
+        public override ioBroker_NewGen.Core.Adapters.Configuration.AdapterConfigSchema? ConfigSchema => BuildSchema(
+            TextField("deviceUri", "Geräte-URI", ""),
+            TextField("username", "Benutzername", ""),
+            PasswordField("password", "Passwort"),
+            TextField("servicePath", "Service-Pfad", "/upnp/control/deviceinfo"),
+            TextField("statePrefix", "State-Präfix", "fritzbox"),
+            NumberField("pollIntervalMs", "Abfrageintervall (ms)", 30000));
+
         protected override Task OnInitializeAsync(CancellationToken cancellationToken)
         {
             _deviceUri = new Uri(ReadConfig("fritzbox.deviceUri", "http://127.0.0.1"));
             _username = ReadConfig("fritzbox.username", string.Empty);
             _password = ReadConfig("fritzbox.password", string.Empty);
             _servicePath = ReadConfig("fritzbox.servicePath", "/upnp/control/deviceinfo");
-            _statePrefix = ReadConfig("fritzbox.statePrefix", "fritzbox");
+            _statePrefix = ResolvePrefix(ReadConfig("fritzbox.statePrefix", "fritzbox"), "fritzbox");
             PollInterval = TimeSpan.FromMilliseconds(Math.Max(1000, ReadConfig("fritzbox.pollIntervalMs", 30000)));
             return Task.CompletedTask;
         }

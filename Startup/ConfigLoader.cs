@@ -38,6 +38,17 @@ namespace ioBroker_NewGen.Startup
             rtx.Config.Set("adapter.adapterAutoStart", true);
             rtx.Config.Set("localization.language", "de_de");
             rtx.Config.Set("localization.fallbackLanguage", "en_GB");
+            rtx.Config.Set("system.setupDone", false);
+            rtx.Config.Set("system.temperatureUnit", "°C");
+            rtx.Config.Set("system.currency", "€");
+            rtx.Config.Set("system.dateFormat", "DD.MM.YYYY");
+            rtx.Config.Set("system.isFloatComma", true);
+            rtx.Config.Set("system.firstDayOfWeek", "monday");
+            rtx.Config.Set("system.country", string.Empty);
+            rtx.Config.Set("system.city", string.Empty);
+            rtx.Config.Set("system.address", string.Empty);
+            rtx.Config.Set("system.latitude", string.Empty);
+            rtx.Config.Set("system.longitude", string.Empty);
 
             foreach (var sourceLine in lines)
             {
@@ -68,6 +79,11 @@ namespace ioBroker_NewGen.Startup
 
                 var qualifiedKey = string.IsNullOrEmpty(section) ? key : $"{section}.{key}";
                 var value = ParseValue(valueText);
+                if (value is string text && text.StartsWith("System.", StringComparison.Ordinal) && text.EndsWith("[]", StringComparison.Ordinal))
+                {
+                    // Reparatur: ältere Speicherläufe haben Arrays als Typnamen geschrieben.
+                    continue;
+                }
                 rtx.Config.Set(qualifiedKey, value);
 
                 if (string.Equals(qualifiedKey, "node.firstrun", StringComparison.OrdinalIgnoreCase))

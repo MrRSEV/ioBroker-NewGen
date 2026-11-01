@@ -194,6 +194,38 @@ through `/api/permissions`, `/api/roles` and `/api/users`.
 
 ---
 
+# Adapter Configuration
+
+Every adapter instance (`hue.0`, `mqtt.0`, legacy `foo.0`, …) has its own settings (like `native` in the original ioBroker),
+stored in `data/adapter-config/<instanceId>.json` and editable in the Admin UI under *Adapter → Konfiguration*
+(permission `SystemConfigure`).
+
+- **Schema:** defaults plus an optional jsonConfig (`AdapterConfigSchema`). Custom adapters override `IAdapter.ConfigSchema`
+  (e.g. `BuildSchema(TextField(...), NumberField(...), PasswordField(...))` in `DeviceAdapterBase`) or ship `io-package.json` /
+  `admin/jsonConfig.json` next to the DLL. Legacy adapters provide the same files in their directory.
+- **Custom adapters:** `Config.Get<T>("hue.bridgeUri")` reads the instance value first and falls back to the global `config.toml`.
+  Values are a snapshot taken at adapter start; saving restarts a running adapter.
+- **Legacy adapters:** the host passes `--configFile <path>`; the AdapterCore exposes it as `this.config`. A restart is required after saving.
+- **API:** `POST /api/adapters/config` with `{adapterId, action: "get" | "save", values}`. Unknown keys and wrong types are rejected,
+  `password` fields are masked and an empty/masked value keeps the stored secret.
+- **jsonConfig support:** panel, tabs, text, number, checkbox, select, password, textarea, header, staticText, divider and `hidden`/`disabled`
+  conditions. Other types (`table`, `sendTo`, `custom`, …) are not rendered yet.
+- **UI:** the "Instanzen" tab lists all instances with settings; the form opens full-page (Save / Save and close / Close).
+- **OAuth (cloud adapters):** declare providers with `AdapterConfigSchema.WithOAuth(new OAuthProviderSpec(...))` (authorize/token URL, keys of
+  clientId/secret/token/refreshToken/expiry fields). The form then shows a login button: the host opens an isolated Chrome/Edge window
+  (temporary profile, private mode, deleted afterwards), receives the code on `http://localhost:<RedirectPort>/callback` (default 53682 –
+  register this redirect URI with the provider; PKCE and `state` are verified) and writes the tokens into the instance config
+  (currently plaintext in `data/adapter-config`; to be replaced by secure storage). Adapters can renew tokens with
+  `Context.AdapterRegistry.OAuth.RefreshAsync(...)` (see the Alexa adapter). The browser opens on the host machine; without Chrome/Edge the UI shows the login link instead (not isolated).
+
+---
+
+# Legacy Adapters (Node.js)
+
+Install in the Admin UI under **Adapter → "+ Legacy-Adapter (ZIP)"**. The ZIP must contain a *built* adapter (`io-package.json`, entry file such as `main.js`, and `node_modules`; the package may sit in one subfolder). It is unpacked to `Adapters\IOBroker\<name>`, and every `@iobroker/adapter-core` is replaced by the bundled bridge-compatible drop-in. Afterwards use **"+ Instanz hinzufügen"** to create `name.0`, `name.1`, … (persisted in `adapter.legacyInstances`); start/stop/restart and configuration are available in the "Instanzen" tab. All persisted instances start with the system. `adapter.legacyAutoStart = true` additionally adopts already present packages as `name.0`. Requires Node.js on the host.
+
+---
+
 # Snapshot Format
 
 ### Description

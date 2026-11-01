@@ -1,4 +1,4 @@
-using System.Xml.Linq;
+﻿using System.Xml.Linq;
 using ioBroker_NewGen.Core.Adapters.Protocol;
 
 namespace ioBroker_NewGen.Adapters.Homematic
@@ -26,11 +26,17 @@ namespace ioBroker_NewGen.Adapters.Homematic
 
         public override string Name => "homematic";
 
+        public override ioBroker_NewGen.Core.Adapters.Configuration.AdapterConfigSchema? ConfigSchema => BuildSchema(
+            TextField("baseUri", "CCU-URI", ""),
+            TextField("statePath", "State-Pfad", "/addons/xmlapi/state.cgi"),
+            TextField("statePrefix", "State-Präfix", "homematic"),
+            NumberField("pollIntervalMs", "Abfrageintervall (ms)", 10000));
+
         protected override Task OnInitializeAsync(CancellationToken cancellationToken)
         {
             _baseUri = new Uri(ReadConfig("homematic.baseUri", "http://127.0.0.1"));
             _statePath = ReadConfig("homematic.statePath", "/addons/xmlapi/state.cgi");
-            _statePrefix = ReadConfig("homematic.statePrefix", "homematic");
+            _statePrefix = ResolvePrefix(ReadConfig("homematic.statePrefix", "homematic"), "homematic");
             PollInterval = TimeSpan.FromMilliseconds(Math.Max(1000, ReadConfig("homematic.pollIntervalMs", 10000)));
             return Task.CompletedTask;
         }

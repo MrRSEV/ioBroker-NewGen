@@ -32,6 +32,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="Legacy\dist\adapter-core\**" Exclude="Legacy\dist\adapter-core\**\*.tgz" Link="Legacy\adapter-core\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.*" />
   </ItemGroup>

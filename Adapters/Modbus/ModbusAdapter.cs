@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using ioBroker_NewGen.Core.Adapters;
 using ioBroker_NewGen.Core.Bus;
 using ioBroker_NewGen.Core.Adapters.Protocol;
@@ -24,6 +24,15 @@ namespace ioBroker_NewGen.Adapters.Modbus
 
         public override string Name => "modbus";
 
+        public override ioBroker_NewGen.Core.Adapters.Configuration.AdapterConfigSchema? ConfigSchema => BuildSchema(
+            TextField("host", "Host", ""),
+            NumberField("port", "Port", 502),
+            NumberField("unitId", "Unit-ID", 1),
+            NumberField("startAddress", "Startadresse", 0),
+            NumberField("registerCount", "Registeranzahl", 1),
+            TextField("statePrefix", "State-Präfix", "modbus"),
+            NumberField("pollIntervalMs", "Abfrageintervall (ms)", 10000));
+
         protected override Task OnInitializeAsync(CancellationToken cancellationToken)
         {
             _host = ReadConfig("modbus.host", "127.0.0.1");
@@ -31,7 +40,7 @@ namespace ioBroker_NewGen.Adapters.Modbus
             _unitId = ReadConfig("modbus.unitId", (byte)1);
             _startAddress = ReadConfig("modbus.startAddress", (ushort)0);
             _registerCount = (ushort)Math.Clamp(ReadConfig("modbus.registerCount", 1), 1, 125);
-            _statePrefix = ReadConfig("modbus.statePrefix", "modbus");
+            _statePrefix = ResolvePrefix(ReadConfig("modbus.statePrefix", "modbus"), "modbus");
             _pollInterval = TimeSpan.FromMilliseconds(Math.Max(1000, ReadConfig("modbus.pollIntervalMs", 10000)));
             return Task.CompletedTask;
         }

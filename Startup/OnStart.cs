@@ -63,16 +63,15 @@ namespace ioBroker_NewGen.Startup
                     adapterRootPath = Path.Combine(AppContext.BaseDirectory, adapterRootPath);
                 }
 
-                if (rtx.Config.Get<bool>("adapter.legacyAutoStart"))
-                {
-                    var legacyDirectory = Path.Combine(adapterRootPath, "IOBroker");
-                    await mainContext.NodeRuntime!.StartDirectoryAsync(legacyDirectory, bindHost, port);
-                }
-
                 mainContext.InitializeAdapterDeployment(adapterRootPath);
+                mainContext.InitializeLegacyAdapters(bindHost, port);
                 mainContext.InitializeBackupService();
                 await mainContext.InitializeSecurityAsync();
                 mainContext.InitializeCustomAdapterRuntime();
+                if (mainContext.LegacyAdapters is not null)
+                {
+                    await mainContext.LegacyAdapters.StartAllAsync(rtx.Config.Get<bool>("adapter.legacyAutoStart"));
+                }
                 var customAdapterRuntime = mainContext.CustomAdapterRuntime!;
                 var adapterDirectory = rtx.Config.Get<string>("adapter.customAdapterDirectory");
                 if (string.IsNullOrWhiteSpace(adapterDirectory))
@@ -151,16 +150,12 @@ namespace ioBroker_NewGen.Startup
                     adapterRootPath = Path.Combine(AppContext.BaseDirectory, adapterRootPath);
                 }
 
-                if (rtx.Config.Get<bool>("adapter.legacyAutoStart"))
-                {
-                    var legacyDirectory = Path.Combine(adapterRootPath, "IOBroker");
-                    mainContext.NodeRuntime!.StartDirectoryAsync(legacyDirectory, bindHost, port).GetAwaiter().GetResult();
-                }
-
                 mainContext.InitializeAdapterDeployment(adapterRootPath);
+                mainContext.InitializeLegacyAdapters(bindHost, port);
                 mainContext.InitializeBackupService();
                 mainContext.InitializeSecurityAsync().GetAwaiter().GetResult();
                 mainContext.InitializeCustomAdapterRuntime();
+                mainContext.LegacyAdapters?.StartAllAsync(rtx.Config.Get<bool>("adapter.legacyAutoStart")).GetAwaiter().GetResult();
                 var customAdapterRuntime = mainContext.CustomAdapterRuntime!;
                 var adapterDirectory = rtx.Config.Get<string>("adapter.customAdapterDirectory");
                 if (string.IsNullOrWhiteSpace(adapterDirectory))

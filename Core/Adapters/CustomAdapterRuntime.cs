@@ -45,7 +45,8 @@ namespace ioBroker_NewGen.Core.Adapters
             IRuntimeContext runtimeContext,
             AdapterInstaller? adapterInstaller = null,
             AdapterPackageInstaller? adapterPackageInstaller = null,
-            AdapterRepositoryClient? adapterRepositoryClient = null)
+            AdapterRepositoryClient? adapterRepositoryClient = null,
+            ioBroker_NewGen.Core.Bridge.LegacyAdapterManager? legacy = null)
         {
             _assemblyLoader = assemblyLoader ?? throw new ArgumentNullException(nameof(assemblyLoader));
             _adapterRegistry = adapterRegistry ?? throw new ArgumentNullException(nameof(adapterRegistry));
@@ -59,8 +60,8 @@ namespace ioBroker_NewGen.Core.Adapters
                 this,
                 adapterInstaller,
                 adapterPackageInstaller,
-                adapterRepositoryClient);
-
+                adapterRepositoryClient,
+                legacy);
             _dispatchHandler = DispatchCommandFrame;
             systemBus.Subscribe("*", _dispatchHandler);
             _subscribed = true;
@@ -108,7 +109,7 @@ namespace ioBroker_NewGen.Core.Adapters
             return loaded;
         }
 
-        public AdapterRegistration Register(IAdapter adapter)
+        public AdapterRegistration Register(IAdapter adapter, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(adapter);
 
@@ -117,8 +118,13 @@ namespace ioBroker_NewGen.Core.Adapters
                 throw new InvalidOperationException($"Adapter '{adapter.Name}' muss den Typ Custom besitzen.");
             }
 
-            var registration = _adapterRegistry.Register(adapter.Name, AdapterType.Custom);
+            var registration = instanceId is null
+                ? _adapterRegistry.Register(adapter.Name, AdapterType.Custom)
+                : _adapterRegistry.RegisterWithId(adapter.Name, AdapterType.Custom, instanceId);
             adapter.Id = registration.Id;
+            var schema = adapter.ConfigSchema
+                ?? Configuration.AdapterConfigSchema.FromDirectory(System.IO.Path.GetDirectoryName(adapter.GetType().Assembly.Location));
+            _adapterRegistry.Configs.RegisterSchema(adapter.Name, schema);
             registration.InstanceReference = adapter;
             var dependencies = adapter.Dependencies ?? Array.Empty<string>();
             if (dependencies.Count > 0)
@@ -262,11 +268,146 @@ namespace ioBroker_NewGen.Core.Adapters
             }
         }
 
+        private const string InstancesKey = "adapter.instances";
+        private bool _instancesRestored;
+
+        private string[] ReadExtraInstances()
+        {
+            try
+            {
+                return _adapterContext.Config.Get<string[]>(InstancesKey)?
+                    .Where(entry => !string.IsNullOrWhiteSpace(entry)).ToArray() ?? Array.Empty<string>();
+            }
+            catch
+            {
+                return Array.Empty<string>();
+            }
+        }
+
+        private void PersistExtraInstances(IEnumerable<string> ids)
+        {
+            var array = ids.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(id => id, StringComparer.Ordinal).ToArray();
+            _adapterContext.Config.Set(InstancesKey, array);
+            try
+            {
+                ioBroker_NewGen.Startup.ConfigFileWriter.Update(
+                    Path.Combine(AppContext.BaseDirectory, "config.toml"),
+                    new Dictionary<string, object?> { [InstancesKey] = array });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"[CustomAdapter] Instanzliste konnte nicht gespeichert werden: {ex.Message}");
+            }
+        }
+
+        private IAdapter? FindTemplate(string name)
+        {
+            return _adapters.Values
+                .Where(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(candidate => candidate.Id, StringComparer.Ordinal)
+                .FirstOrDefault();
+        }
+
+        private void RestoreInstances()
+        {
+            if (_instancesRestored)
+            {
+                return;
+            }
+
+            _instancesRestored = true;
+            foreach (var id in ReadExtraInstances())
+            {
+                var dot = id.LastIndexOf('.');
+                if (dot <= 0 || _adapterRegistry.Exists(id))
+                {
+                    continue;
+                }
+
+                var template = FindTemplate(id[..dot]);
+                if (template is null || string.Equals(template.Name, "admin", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogWarning($"[CustomAdapter] Instanz '{id}' kann nicht wiederhergestellt werden (Adapter fehlt).");
+                    continue;
+                }
+
+                try
+                {
+                    Register((IAdapter)Activator.CreateInstance(template.GetType())!, id);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"[CustomAdapter] Instanz '{id}' konnte nicht erzeugt werden: {ex.Message}");
+                }
+            }
+        }
+
+        /// <summary>Legt eine weitere Instanz (Name.N) des Adapters an und merkt sie sich in der Konfiguration.</summary>
+        public async Task<string?> AddInstanceAsync(string adapterReference, CancellationToken cancellationToken = default)
+        {
+            await _lifecycleGate.WaitAsync(cancellationToken);
+            try
+            {
+                var baseId = ResolveAdapterId(adapterReference);
+                if (baseId is null || !_adapters.TryGetValue(baseId, out var template) ||
+                    string.Equals(template.Name, "admin", StringComparison.OrdinalIgnoreCase))
+                {
+                    return null;
+                }
+
+                var index = 0;
+                while (_adapterRegistry.Exists($"{template.Name}.{index}"))
+                {
+                    index++;
+                }
+
+                var id = $"{template.Name}.{index}";
+                Register((IAdapter)Activator.CreateInstance(template.GetType())!, id);
+                PersistExtraInstances(ReadExtraInstances().Append(id));
+                return id;
+            }
+            finally
+            {
+                _lifecycleGate.Release();
+            }
+        }
+
+        /// <summary>Stoppt und löscht eine zusätzliche Instanz samt Konfiguration. Die erste Instanz (.0) bleibt bestehen.</summary>
+        public async Task<bool> RemoveInstanceAsync(string adapterId, CancellationToken cancellationToken = default)
+        {
+            await _lifecycleGate.WaitAsync(cancellationToken);
+            try
+            {
+                var resolvedId = ResolveAdapterId(adapterId);
+                if (resolvedId is null || resolvedId.EndsWith(".0", StringComparison.Ordinal) ||
+                    !_adapters.TryGetValue(resolvedId, out var adapter))
+                {
+                    return false;
+                }
+
+                if (_adapterRegistry.Get(resolvedId)?.Status is AdapterStatus.Connected or AdapterStatus.Connecting)
+                {
+                    await StopAdapterCoreAsync(resolvedId, cancellationToken);
+                }
+
+                _adapters.TryRemove(resolvedId, out _);
+                _adapterRegistry.Unregister(resolvedId);
+                _adapterRegistry.Configs.Delete(resolvedId);
+                PersistExtraInstances(ReadExtraInstances().Where(id => !string.Equals(id, resolvedId, StringComparison.OrdinalIgnoreCase)));
+                return true;
+            }
+            finally
+            {
+                _lifecycleGate.Release();
+            }
+        }
+
         public async Task<int> StartAllAsync(CancellationToken cancellationToken = default)
         {
             await _lifecycleGate.WaitAsync(cancellationToken);
             try
             {
+                RestoreInstances();
                 var started = 0;
                 var configuredAdapters = ReadEnabledAdapterReferences();
                 var adapterIds = configuredAdapters is null

@@ -5,6 +5,26 @@ All significant changes to this project are documented in this file.
 The format follows the principles of [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project loosely adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+## [0.4.2] - 2026-11-01
+
+### Added
+- Legacy (Node.js) adapters can be installed as a ZIP in the Admin UI (tab "Adapter" → "+ Legacy-Adapter (ZIP)", `POST /api/adapters/legacy`, permission `AdapterInstall`) and uninstalled again. The package must be built (`io-package.json`, entry file, `node_modules`); `@iobroker/adapter-core` inside it is replaced by the bundled drop-in (`Legacy/adapter-core`, copied to the output directory). Failures and progress are written to the log.
+- Multiple instances of the same adapter (`alexa.0`, `alexa.1`, …), also for legacy adapters: `POST /api/adapters/instances` (`add`/`remove`). Extra custom instances are persisted in `adapter.instances`, legacy instances in `adapter.legacyInstances` and restored at startup; each instance has its own config file. Non-primary custom instances default their state prefix to the instance id. `adapter.legacyAutoStart` only adopts already present packages as `name.0`.
+- Admin UI: tab "Instanzen" with "Instanz hinzufügen", start/stop/restart, configuration, uptime and removal per instance (custom and legacy).
+- Admin UI: new "Übersicht" start page (`#tab-overview`) with status, adapter/instance/object cards, system information (platform, runtime, uptime, RAM, CPU), active adapters and a system log excerpt, backed by the new `/api/overview` endpoint (permission `SystemRead`).
+- Global `[system]` settings in `config.toml` (`temperatureUnit`, `currency`, `dateFormat`, `isFloatComma`, `firstDayOfWeek`, `country`, `city`, `address`, `latitude`, `longitude`, `setupDone`), editable via `/api/config`. After the forced password change the Admin UI shows a first-run setup step ("Wichtige Haupteinstellungen") until `system.setupDone` is true; it can be skipped. Latitude/longitude can be taken from the browser's geolocation.
+- Unified per-instance adapter configuration for Custom and Legacy adapters (`Core/Adapters/Configuration`): `AdapterConfigSchema` (defaults + jsonConfig, also read from `io-package.json` / `admin/jsonConfig.json`), `AdapterConfigService` (`AdapterRegistry.Configs`, files in `data/adapter-config/<instanceId>.json`, validation, password masking) and `InstanceConfig` (instance values first, global `config.toml` as fallback).
+- `IAdapter.ConfigSchema`; all bundled adapters (Hue, Shelly, KNX, Modbus, Homematic, Bosch, Alexa, FritzBox, MQTT, Zigbee) declare their settings.
+- Legacy adapters receive `--configFile <path>`; `Adapter.js` loads it as `this.config`.
+- Admin: `POST /api/adapters/config` (`get`/`save`, permission `SystemConfigure`) and a full-page config form (Save / Save and close / Close) that renders jsonConfig. Saving restarts running custom and legacy instances automatically.
+- OAuth login for cloud adapters (`OAuthFlowService`, `AdapterRegistry.OAuth`, `POST /api/adapters/oauth`): isolated Chrome/Edge session (temporary profile, private mode), catches the authorization code on `http://localhost:<port>/callback` (PKCE + state check) and stores the tokens in the instance config for now (plaintext, to be replaced by secure storage). The Alexa adapter uses provider `amazon` and refreshes its token automatically.
+
+### Changed
+- Admin UI: "States" tab renamed to "Objekte" (`#tab-objects`).
+- Autostart entries by adapter name only apply to the primary instance (`.0`).
+- Bridge handshake assigns the connection by exact instance id (e.g. `iot.1`) before falling back to the adapter name.
 ## [0.4.1] - 2026-10-30
 
 ### Added

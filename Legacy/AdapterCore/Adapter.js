@@ -2,6 +2,7 @@
 
 const { EventEmitter } = require('events');
 const path = require('path');
+const fs = require('fs');
 const { BridgeStateSynchronizer } = require('./BridgeStateSynchronizer');
 const { SubscriptionManager } = require('./SubscriptionManager');
 const { StateApi } = require('./StateApi');
@@ -17,6 +18,15 @@ function readArguments(argv) {
     if (argv[index].startsWith('--') && argv[index + 1] !== undefined) result[argv[index].slice(2)] = argv[++index];
   }
   return result;
+}
+
+function readConfigFile(file) {
+  if (!file) return undefined;
+  try {
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch {
+    return undefined;
+  }
 }
 
 function parseConfig(value) {
@@ -46,7 +56,7 @@ class Adapter extends EventEmitter {
     this.instance = Number(options.instance ?? args.instance ?? (instanceFromName ? instanceFromName[1] : 0)) || 0;
     this.namespace = `${this.name}.${this.instance}`;
     this.adapterDir = options.adapterDir || (require.main && require.main.filename ? path.dirname(require.main.filename) : process.cwd());
-    this.config = options.config || parseConfig(process.env.NEWGEN_ADAPTER_CONFIG);
+    this.config = options.config || readConfigFile(args.configFile) || parseConfig(process.env.NEWGEN_ADAPTER_CONFIG);
     this.common = options.common || {};
     this.connected = false;
     this._unloaded = false;

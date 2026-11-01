@@ -36,6 +36,24 @@ namespace ioBroker_NewGen.Core.Adapters.Protocol
 
         protected virtual string AddressPrefixConfigurationKey => "addressPrefix";
 
+        public override ioBroker_NewGen.Core.Adapters.Configuration.AdapterConfigSchema? ConfigSchema
+        {
+            get
+            {
+                var client = new MqttClientOptions();
+                return BuildSchema(
+                    TextField("host", "Broker-Host", client.Host),
+                    NumberField("port", "Port", client.Port),
+                    TextField("clientId", "Client-ID", client.ClientId),
+                    TextField("username", "Benutzername", string.Empty),
+                    PasswordField("password", "Passwort"),
+                    CheckboxField("useTls", "TLS verwenden", client.UseTls),
+                    NumberField("keepAliveSeconds", "Keep-Alive (s)", client.KeepAliveSeconds),
+                    TextField("topicFilter", "Topic-Filter", client.TopicFilter),
+                    TextField(AddressPrefixConfigurationKey, "Adresspräfix", Options.AddressPrefix));
+            }
+        }
+
         protected override Task OnInitializeAsync(CancellationToken cancellationToken)
         {
             var prefix = ConfigurationPrefix;

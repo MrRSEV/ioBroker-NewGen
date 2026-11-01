@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 using ioBroker_NewGen.Core.Adapters;
 using ioBroker_NewGen.Core.Adapters.Protocol;
@@ -24,12 +24,18 @@ namespace ioBroker_NewGen.Adapters.Knx
 
         public override string Name => "knx";
 
+        public override ioBroker_NewGen.Core.Adapters.Configuration.AdapterConfigSchema? ConfigSchema => BuildSchema(
+            TextField("gateway", "Gateway-Host", ""),
+            NumberField("port", "Port", 3671),
+            TextField("groupAddress", "Gruppenadresse", "0/0/1"),
+            TextField("statePrefix", "State-Präfix", "knx"));
+
         protected override Task OnInitializeAsync(CancellationToken cancellationToken)
         {
             _gateway = ReadConfig("knx.gateway", "127.0.0.1");
             _port = ReadConfig("knx.port", 3671);
             _groupAddress = ParseGroupAddress(ReadConfig("knx.groupAddress", "0/0/1"));
-            _statePrefix = ReadConfig("knx.statePrefix", "knx");
+            _statePrefix = ResolvePrefix(ReadConfig("knx.statePrefix", "knx"), "knx");
             return Task.CompletedTask;
         }
 

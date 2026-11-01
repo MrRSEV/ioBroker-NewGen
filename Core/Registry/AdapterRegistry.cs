@@ -18,8 +18,15 @@ namespace ioBroker_NewGen.Core.Registry
         private readonly object _idLock = new();
         private readonly SystemEventBus? _eventBus;
 
+        /// <summary>Instanzbezogene Adaptereinstellungen (Custom und Legacy).</summary>
+        public ioBroker_NewGen.Core.Adapters.Configuration.AdapterConfigService Configs { get; } = new();
+
+        /// <summary>OAuth-Anmeldungen (isolierte Browser-Sitzung) für Adapter mit Cloud-Zugang.</summary>
+        public ioBroker_NewGen.Core.Adapters.Configuration.OAuthFlowService OAuth { get; }
+
         public AdapterRegistry(SystemEventBus? eventBus = null)
         {
+            OAuth = new ioBroker_NewGen.Core.Adapters.Configuration.OAuthFlowService(Configs);
             _eventBus = eventBus;
         }
 
@@ -44,6 +51,40 @@ namespace ioBroker_NewGen.Core.Registry
             };
 
             _adaptersById[id] = registration;
+            _eventBus?.PublishAdapterLifecycle(
+                this,
+                new AdapterLifecycleEventArgs(registration, AdapterStatus.Created));
+            return registration;
+        }
+
+        public AdapterRegistration RegisterWithId(string name, AdapterType type, string id, Dictionary<string, string>? metadata = null)
+        {
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(id))
+            {
+                throw new ArgumentException("Name und ID dürfen nicht leer sein.");
+            }
+
+            var registration = new AdapterRegistration
+            {
+                Name = name,
+                Id = id,
+                Type = type,
+                Metadata = metadata ?? new Dictionary<string, string>()
+            };
+
+            lock (_idLock)
+            {
+                if (!_adaptersById.TryAdd(id, registration))
+                {
+                    throw new InvalidOperationException($"Instanz '{id}' existiert bereits.");
+                }
+
+                if (int.TryParse(id[(id.LastIndexOf('.') + 1)..], out var index))
+                {
+                    _instanceCounters.AddOrUpdate(name, index, (_, current) => Math.Max(current, index));
+                }
+            }
+
             _eventBus?.PublishAdapterLifecycle(
                 this,
                 new AdapterLifecycleEventArgs(registration, AdapterStatus.Created));

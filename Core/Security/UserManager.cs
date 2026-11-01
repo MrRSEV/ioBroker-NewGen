@@ -153,6 +153,19 @@ namespace ioBroker.Core.Security
             await _audit.WriteAsync(user.Id, enabled ? "UserEnabled" : "UserDisabled", user.Username, cancellationToken).ConfigureAwait(false);
         }
 
+        public async Task SetDisplayNameAsync(string username, string? displayName, CancellationToken cancellationToken = default)
+        {
+            await using var connection = await _database.OpenAsync(cancellationToken).ConfigureAwait(false);
+            var user = await FindAsync(connection, username, cancellationToken).ConfigureAwait(false)
+                ?? throw new InvalidOperationException($"Benutzer '{username}' existiert nicht.");
+            await using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE Users SET DisplayName = $display WHERE Id = $id";
+            command.AddParameter("$display", string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim());
+            command.AddParameter("$id", user.Id);
+            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            await _audit.WriteAsync(user.Id, "UserUpdated", user.Username, cancellationToken).ConfigureAwait(false);
+        }
+
         public async Task<IReadOnlyList<string>> GetRolesAsync(string username, CancellationToken cancellationToken = default)
         {
             await using var connection = await _database.OpenAsync(cancellationToken).ConfigureAwait(false);

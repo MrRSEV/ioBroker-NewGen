@@ -68,6 +68,9 @@ namespace ioBroker_NewGen.Controllers
         /// </summary>
         public NodeAdapterRuntime? NodeRuntime { get; private set; }
 
+        /// <summary>Installation und Instanzen der Legacy-Adapter (ZIP-Upload, Lifecycle).</summary>
+        public LegacyAdapterManager? LegacyAdapters { get; private set; }
+
         /// <summary>
         /// Runtime für host-interne C#-Adapter.
         /// </summary>
@@ -276,7 +279,25 @@ namespace ioBroker_NewGen.Controllers
                 this,
                 AdapterInstaller,
                 AdapterPackageInstaller,
-                AdapterRepositoryClient);
+                AdapterRepositoryClient,
+                LegacyAdapters);
+        }
+
+        public void InitializeLegacyAdapters(string bridgeHost, int bridgePort)
+        {
+            if (NodeRuntime is null || AdapterInstaller is null)
+            {
+                return;
+            }
+
+            LegacyAdapters ??= new LegacyAdapterManager(
+                NodeRuntime,
+                AdapterInstaller,
+                AdapterRegistry,
+                Config,
+                Logger,
+                bridgeHost,
+                bridgePort);
         }
 
         public void InitializeAdapterDeployment(string rootPath)

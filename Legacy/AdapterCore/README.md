@@ -26,7 +26,10 @@ module.exports = options => new utils.Adapter(options);
 
 Auch `class X extends utils.Adapter` wird unterstützt. Der Start (`ready`) erfolgt im nächsten Tick.
 Von `NodeAdapterRuntime` übergebene Argumente `--host --port --name [--instance]` werden automatisch gelesen
-(alternativ `NEWGEN_BRIDGE_HOST/PORT`, Konfiguration über `NEWGEN_ADAPTER_CONFIG` als JSON).
+(alternativ `NEWGEN_BRIDGE_HOST/PORT`). Die Adapter-Einstellungen (`this.config`, entspricht `native`) liest der Core aus der per
+`--configFile <pfad>` übergebenen JSON-Datei der Instanz; Fallback ist `NEWGEN_ADAPTER_CONFIG` als JSON. Der Host legt die Datei unter
+`data/adapter-config/<name>.<n>.json` an (Defaults aus `io-package.json → native`), bearbeitet wird sie in der Admin-UI unter „Adapter → Konfiguration“.
+Änderungen wirken nach einem Neustart des Adapters.
 
 ## Dateien
 

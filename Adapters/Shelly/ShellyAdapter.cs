@@ -38,6 +38,11 @@ namespace ioBroker_NewGen.Adapters.Shelly
 
         public override string Name => "shelly";
 
+        public override ioBroker_NewGen.Core.Adapters.Configuration.AdapterConfigSchema? ConfigSchema => BuildSchema(
+            TextField("deviceUri", "Geräte-URI", "http://127.0.0.1"),
+            NumberField("switchId", "Schalter-ID", 0),
+            NumberField("pollIntervalMs", "Abfrageintervall (ms)", 5000));
+
         protected override Task OnInitializeAsync(CancellationToken cancellationToken)
         {
             _options = new ShellyAdapterOptions

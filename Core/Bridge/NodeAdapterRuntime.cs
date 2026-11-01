@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using ioBroker_NewGen.Core.Adapters.Configuration;
 using ioBroker_NewGen.Core.Registry;
 using RSEV.Utilities.Logging;
 using RSEV.Utilities.Processes;
@@ -52,13 +53,35 @@ namespace ioBroker_NewGen.Core.Bridge
         /// <param name="name">Sprechender Adaptername (z. B. "mqtt").</param>
         /// <param name="scriptPath">Pfad zum Node.js-Einstiegsskript des Adapters.</param>
         /// <param name="arguments">Optionale Kommandozeilen-Argumente.</param>
-        public async Task<AdapterRegistration> StartAdapterAsync(string name, string scriptPath, string[]? arguments = null)
+        public async Task<AdapterRegistration> StartAdapterAsync(
+            string name,
+            string scriptPath,
+            string[]? arguments = null,
+            string? instanceId = null,
+            string? adapterDirectory = null)
         {
-            var registration = _adapterRegistry.Register(name, Routing.AdapterType.IoBroker);
+            var registration = instanceId is null
+                ? _adapterRegistry.Register(name, Routing.AdapterType.IoBroker)
+                : _adapterRegistry.Get(instanceId)
+                    ?? _adapterRegistry.RegisterWithId(name, Routing.AdapterType.IoBroker, instanceId);
+            if (_processIdByAdapterId.ContainsKey(registration.Id))
+            {
+                return registration;
+            }
+
             registration.Metadata["scriptPath"] = scriptPath;
             _adapterRegistry.UpdateStatus(registration.Id, AdapterStatus.Connecting);
 
-            var spec = new ProcessSpec(registration.Id, scriptPath, arguments ?? Array.Empty<string>());
+            var arguments1 = arguments ?? Array.Empty<string>();
+            var configs = _adapterRegistry.Configs;
+            configs.RegisterSchema(name, AdapterConfigSchema.FromDirectory(adapterDirectory ?? Path.GetDirectoryName(scriptPath)));
+            if (configs.HasConfig(name) && !arguments1.Contains("--configFile"))
+            {
+                var configFile = configs.EnsureFile(registration.Id, name);
+                arguments1 = arguments1.Concat(new[] { "--configFile", configFile }).ToArray();
+            }
+
+            var spec = new ProcessSpec(registration.Id, scriptPath, arguments1);
             var process = CreateProcess(spec);
 
             _processController.Register(process);
@@ -94,9 +117,7 @@ namespace ioBroker_NewGen.Core.Bridge
             var registrations = new List<AdapterRegistration>();
             foreach (var adapterDirectory in Directory.EnumerateDirectories(directory).OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
             {
-                var scriptPath = new[] { "main.js", "index.js", "adapter.js" }
-                    .Select(file => Path.Combine(adapterDirectory, file))
-                    .FirstOrDefault(File.Exists);
+                var scriptPath = LegacyAdapterPackage.ResolveEntry(adapterDirectory);
                 if (scriptPath is null)
                 {
                     _logger.LogWarning($"[NodeRuntime] Kein Einstiegsskript in '{adapterDirectory}' gefunden.");
@@ -107,11 +128,14 @@ namespace ioBroker_NewGen.Core.Bridge
                 registrations.Add(await StartAdapterAsync(
                     name,
                     scriptPath,
-                    new[] { "--host", bridgeHost, "--port", bridgePort.ToString(System.Globalization.CultureInfo.InvariantCulture), "--name", name }));
+                    new[] { "--host", bridgeHost, "--port", bridgePort.ToString(System.Globalization.CultureInfo.InvariantCulture), "--name", name },
+                    adapterDirectory: adapterDirectory));
             }
 
             return registrations;
         }
+
+        public bool IsRunning(string adapterId) => _processIdByAdapterId.ContainsKey(adapterId);
 
         /// <summary>
         /// Stoppt den Node.js-Prozess eines Adapters und aktualisiert dessen Status.

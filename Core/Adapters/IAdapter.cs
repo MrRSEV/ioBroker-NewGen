@@ -39,6 +39,12 @@ namespace ioBroker_NewGen.Core.Adapters
         /// </summary>
         string? LocalizationDirectory => null;
 
+        /// <summary>
+        /// Optionales Konfigurationsschema (Standardwerte + jsonConfig) für die Admin-Oberfläche.
+        /// Ohne Angabe wird <c>io-package.json</c>/<c>jsonConfig.json</c> neben der Assembly gesucht.
+        /// </summary>
+        ioBroker_NewGen.Core.Adapters.Configuration.AdapterConfigSchema? ConfigSchema => null;
+
         Task InitializeAsync(IAdapterContext context, CancellationToken cancellationToken = default);
 
         Task StartAsync(CancellationToken cancellationToken = default);

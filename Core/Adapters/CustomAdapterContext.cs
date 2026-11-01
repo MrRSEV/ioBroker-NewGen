@@ -23,8 +23,10 @@ namespace ioBroker_NewGen.Core.Adapters
             CustomAdapterRuntime adapterRuntime,
             AdapterInstaller? adapterInstaller,
             AdapterPackageInstaller? adapterPackageInstaller,
-            AdapterRepositoryClient? adapterRepositoryClient)
+            AdapterRepositoryClient? adapterRepositoryClient,
+            ioBroker_NewGen.Core.Bridge.LegacyAdapterManager? legacy = null)
         {
+            Legacy = legacy;
             Matrix = matrix ?? throw new ArgumentNullException(nameof(matrix));
             SystemBus = systemBus ?? throw new ArgumentNullException(nameof(systemBus));
             _router = router ?? throw new ArgumentNullException(nameof(router));
@@ -53,6 +55,8 @@ namespace ioBroker_NewGen.Core.Adapters
 
         public AdapterRepositoryClient? AdapterRepositoryClient { get; }
 
+        public ioBroker_NewGen.Core.Bridge.LegacyAdapterManager? Legacy { get; }
+
         public IConfig Config { get; }
 
         public IRuntimeContext RuntimeContext { get; }
@@ -63,17 +67,39 @@ namespace ioBroker_NewGen.Core.Adapters
 
         public Task<bool> StartAdapterAsync(string adapterId, CancellationToken cancellationToken = default)
         {
-            return AdapterRuntime.StartAdapterAsync(adapterId, cancellationToken);
+            return IsLegacyInstance(adapterId)
+                ? Legacy!.StartInstanceAsync(adapterId, cancellationToken)
+                : AdapterRuntime.StartAdapterAsync(adapterId, cancellationToken);
         }
 
         public Task<bool> StopAdapterAsync(string adapterId, CancellationToken cancellationToken = default)
         {
-            return AdapterRuntime.StopAdapterAsync(adapterId, cancellationToken);
+            return IsLegacyInstance(adapterId)
+                ? Legacy!.StopInstanceAsync(adapterId, cancellationToken)
+                : AdapterRuntime.StopAdapterAsync(adapterId, cancellationToken);
         }
 
         public Task<bool> RestartAdapterAsync(string adapterId, CancellationToken cancellationToken = default)
         {
-            return AdapterRuntime.RestartAdapterAsync(adapterId, cancellationToken);
+            return IsLegacyInstance(adapterId)
+                ? Legacy!.RestartInstanceAsync(adapterId, cancellationToken)
+                : AdapterRuntime.RestartAdapterAsync(adapterId, cancellationToken);
+        }
+
+        private bool IsLegacyInstance(string adapterId) => Legacy?.IsInstance(adapterId) == true;
+
+        public Task<string?> AddInstanceAsync(string adapterId, CancellationToken cancellationToken = default)
+        {
+            return AdapterRegistry.Get(adapterId)?.Type == AdapterType.IoBroker || (Legacy?.IsInstalled(adapterId) ?? false)
+                ? Legacy?.AddInstanceAsync(adapterId, cancellationToken) ?? Task.FromResult<string?>(null)
+                : AdapterRuntime.AddInstanceAsync(adapterId, cancellationToken);
+        }
+
+        public Task<bool> RemoveInstanceAsync(string adapterId, CancellationToken cancellationToken = default)
+        {
+            return IsLegacyInstance(adapterId)
+                ? Legacy!.RemoveInstanceAsync(adapterId, cancellationToken)
+                : AdapterRuntime.RemoveInstanceAsync(adapterId, cancellationToken);
         }
 
         public void Publish(BusFrame frame)

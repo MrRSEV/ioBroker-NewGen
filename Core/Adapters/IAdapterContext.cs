@@ -34,6 +34,9 @@ namespace ioBroker_NewGen.Core.Adapters
 
         AdapterRepositoryClient? AdapterRepositoryClient { get; }
 
+        /// <summary>Verwaltung der Legacy-Adapter (Node.js); null, wenn die Bridge nicht läuft.</summary>
+        ioBroker_NewGen.Core.Bridge.LegacyAdapterManager? Legacy => null;
+
         IConfig Config { get; }
 
         IRuntimeContext RuntimeContext { get; }
@@ -62,6 +65,14 @@ namespace ioBroker_NewGen.Core.Adapters
         }
 
         void Publish(BusFrame frame);
+
+        /// <summary>Legt eine weitere Instanz des Adapters an und liefert deren ID (oder null).</summary>
+        Task<string?> AddInstanceAsync(string adapterId, CancellationToken cancellationToken = default)
+            => Task.FromResult<string?>(null);
+
+        /// <summary>Entfernt eine zusätzliche Instanz (nicht die erste, .0).</summary>
+        Task<bool> RemoveInstanceAsync(string adapterId, CancellationToken cancellationToken = default)
+            => Task.FromResult(false);
 
         void Route(BusFrame frame);
     }

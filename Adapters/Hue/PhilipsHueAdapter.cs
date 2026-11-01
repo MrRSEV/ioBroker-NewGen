@@ -38,6 +38,11 @@ namespace ioBroker_NewGen.Adapters.Hue
 
         public override string Name => "hue";
 
+        public override ioBroker_NewGen.Core.Adapters.Configuration.AdapterConfigSchema? ConfigSchema => BuildSchema(
+            TextField("bridgeUri", "Bridge-URI", "http://127.0.0.1"),
+            PasswordField("apiKey", "API-Schlüssel"),
+            NumberField("pollIntervalMs", "Abfrageintervall (ms)", 10000));
+
         protected override Task OnInitializeAsync(CancellationToken cancellationToken)
         {
             _options = new PhilipsHueAdapterOptions

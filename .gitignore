@@ -1,4 +1,5 @@
+ioBroker-NewGen.adapters/lagacy/
 .vs/
 bin/
 obj/
-Legacy/dist/
+.artifacts/

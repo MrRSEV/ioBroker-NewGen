@@ -1,7 +1,7 @@
 # ioBroker-NewGen
 
 > Preview of an emerging project called **ioBroker-NewGen**.  
-> Current status: **dev0.4.2** (Core.Security, LocalizationService, AdminUI-Adapterverwaltung; Hardware-/Cloud-Abnahmen ausstehend).
+> Current status: **v1.0.0-beta** (Core.Security, LocalizationService, AdminUI-Adapterverwaltung; Hardware-/Cloud-Abnahmen ausstehend).
 
 ## Vision
 

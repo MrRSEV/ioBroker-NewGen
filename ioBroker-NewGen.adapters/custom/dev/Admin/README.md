@@ -1,5 +1,7 @@
 # ioBroker-NewGen Admin UI
 
+> **Unofficial community project.** This project is not affiliated with or endorsed by the official ioBroker project.
+
 The Admin UI is the `admin` custom adapter for ioBroker-NewGen. It is built as
 a separate .NET 9 assembly and loaded by the host's custom-adapter runtime; it
 is not part of the host executable.

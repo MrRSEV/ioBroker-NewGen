@@ -645,7 +645,7 @@ namespace ioBroker_NewGen.Admin
                     function ovCard(label,big,sub,cls){return el('div',{className:'ovcard'},el('div',{className:'lbl2',textContent:label}),el('div',{className:'big '+(cls||''),textContent:String(big)}),el('div',{className:'sub',textContent:sub}));}
                     function ovRow(label,value,pct){const r=el('div',{className:'ovrow'},el('span',{textContent:label}));if(pct!=null)r.append(el('span',{className:'ovbar'},el('i',{style:'width:'+Math.max(0,Math.min(100,pct))+'%'})));r.append(el('span',{textContent:value}));return r;}
                     function ovPanel(title,link,target,...rows){const hd=el('div',{className:'hd'},el('h3',{textContent:title}));if(link){hd.append(el('a',{textContent:link,onclick:()=>nav(target)}));}return el('div',{className:'ovpanel'},hd,...rows);}
-                    async function refreshOverview(adapters){const box=$('ovBox');if(document.querySelector('.panel[data-panel="overview"]').classList.contains('hidden'))return;try{const [o,logs]=await Promise.all([loadJson('/api/overview'),loadJson('/api/logs').catch(()=>[])]);if(o.error){box.textContent=o.error;return;}
+                    async function refreshOverview(adapters){const box=$('ovBox');if(document.querySelector('.panel[data-panel="overview"]').classList.contains('hidden'))return;try{const [o,logs]=await Promise.all([loadJson('/api/overview'),loadJson('/api/logs')]);if(o.error){box.textContent=o.error;return;}
                     const s=o.System,a=o.Adapters;const memPct=s.MemoryTotalBytes?s.MemoryUsedBytes/s.MemoryTotalBytes*100:0;
                     const cards=el('div',{className:'ovcards'},ovCard(t('ov.status','Systemstatus'),o.Status,o.Status==='OK'?t('ov.statusOk','System läuft stabil'):t('ov.statusWarn','Adapter mit Fehlern: ')+a.Faulted,o.Status==='OK'?'ok':'warn'),
                     ovCard(t('menu.adapters','Adapter'),a.Total,a.Active+' '+t('ov.active','aktiv')+' / '+a.Inactive+' '+t('ov.inactive','inaktiv')),
@@ -656,7 +656,7 @@ namespace ioBroker_NewGen.Admin
                     for(const x of list.filter(x=>x.Status==='Connected'||x.Status==='Running').slice(0,8)){const v=x.Metadata&&typeof x.Metadata==='object'&&x.Metadata.version?'v'+x.Metadata.version+' ':'';act.append(el('div',{className:'ovrow'},el('span',{textContent:x.Name}),el('span',{},v,el('span',{className:'badge',textContent:t('ov.active','aktiv')}))));}
                     if(!act.querySelector('.ovrow'))act.append(el('div',{className:'muted',textContent:t('ov.noActive','Keine aktiven Adapter')}));
                     const lines=(Array.isArray(logs)?logs:[]).flatMap(f=>f.lines||[]).slice(-8);const log=ovPanel(t('ov.syslog','Systemprotokoll'),null,null);
-                    for(const l of lines)log.append(el('div',{className:'ovrow'},el('span',{className:'ovlog',textContent:l})));if(!lines.length)log.append(el('div',{className:'muted',textContent:t('ov.noLog','Keine Protokolleinträge')}));
+                    for(const l of lines)log.append(el('div',{className:'ovrow'},el('span',{className:'ovlog',textContent:l})));if(logs&&logs.error)log.append(el('div',{className:'muted',textContent:logs.error}));else if(!lines.length)log.append(el('div',{className:'muted',textContent:t('ov.noLog','Keine Protokolleinträge')}));
                     box.replaceChildren(cards,info,el('div',{className:'ovtwo'},act,log));}catch(error){box.textContent=error.message;}}
                     async function start(){try{const me=await api('/api/auth/me');if(me.mustChangePassword){show('change');return;}perms.clear();(me.permissions||[]).forEach(p=>perms.add(p));$('who').textContent='Angemeldet als '+(me.displayName||me.username)+' ('+me.roles.join(', ')+')';
                     if(perms.has('SystemConfigure')&&perms.has('SystemRead')){let cfg=null;try{cfg=await api('/api/config');}catch{}if(cfg&&cfg['system.setupDone']!==true){showSetup(cfg);return;}}
@@ -1635,13 +1635,17 @@ namespace ioBroker_NewGen.Admin
                     return Task.FromResult(Unauthorized());
                 }
 
-                var logs = Directory.EnumerateFiles(AppContext.BaseDirectory, "*.log", SearchOption.TopDirectoryOnly)
-                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-                    .Select(path => new
+                var latestLog = Path.Combine(AppContext.BaseDirectory, "log", "latest.log");
+                var logs = File.Exists(latestLog)
+                    ? new[]
                     {
-                        file = Path.GetFileName(path),
-                        lines = ReadTail(path, 100)
-                    });
+                        new
+                        {
+                            file = Path.GetFileName(latestLog),
+                            lines = ReadTail(latestLog, 100)
+                        }
+                    }
+                    : Array.Empty<object>();
                 return Task.FromResult(Response(200, JsonSerializer.Serialize(logs), "application/json; charset=utf-8"));
             }
         }
@@ -2592,14 +2596,20 @@ namespace ioBroker_NewGen.Admin
 
         private static string[] ReadTail(string path, int maxLines)
         {
-            try
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var reader = new StreamReader(stream);
+            var lines = new Queue<string>(maxLines);
+            while (reader.ReadLine() is { } line)
             {
-                return File.ReadLines(path).TakeLast(maxLines).ToArray();
+                if (lines.Count == maxLines)
+                {
+                    lines.Dequeue();
+                }
+
+                lines.Enqueue(line);
             }
-            catch
-            {
-                return Array.Empty<string>();
-            }
+
+            return lines.ToArray();
         }
 
         private static EndpointResponse Unauthorized()

@@ -1,5 +1,7 @@
 # ioBroker-NewGen
 
+> **Unofficial community project.** This project is not affiliated with or endorsed by the official ioBroker project.
+>
 > Preview of an emerging project called **ioBroker-NewGen**.  
 > Current status: **v1.0.0-beta** (Core.Security, LocalizationService, AdminUI-Adapterverwaltung; Hardware-/Cloud-Abnahmen ausstehend).
 

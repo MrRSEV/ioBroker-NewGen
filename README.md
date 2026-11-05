@@ -1,45 +1,48 @@
-# ioBroker-NewGen Unofficial community project
+# ioBroker-NewGen
 
-> This project is not affiliated with or endorsed by the official ioBroker project.
->
-> Preview of an emerging project called **ioBroker-NewGen**.  
-> Current status: **v1.0.0-beta** (Core.Security, LocalizationService, AdminUI-Adapterverwaltung; Hardware-/Cloud-Abnahmen ausstehend).
+> **Unofficial community project.** This project is not affiliated with or endorsed by the official ioBroker project.
 
 ## Vision
 
-**ioBroker-NewGen** is a modern, stable, and object‑oriented C# smart home system built around a **neuronal storage** — a semantic vector matrix without any intelligence.  
-Objects, states, history samples, and metadata are *materialized views* extracted from this vector space.
+**ioBroker-NewGen** is a modern, stable, object-oriented C# smart home system built around a **neuronal storage** — a semantic vector matrix without any intelligence. Objects, states, history samples, and metadata are materialized views extracted from this vector space.
 
 The goal is a clean separation between core logic, adapter runtime, routing, and user interface.
 
-### Primary Goals
-- Replace the historical ioBroker architecture with a modern C# state matrix  
-- Isolated Node.js runtimes for legacy adapters  
-- Drop-in `@iobroker/adapter-core` replacement so unmodified legacy adapters run without js-controller over the TCP bridge  
-- Unified adapter API for all adapter types  
-- Stable, object‑oriented real‑time state‑sync engine  
-- New admin UI in C#  
-- Long‑term migration of popular ioBroker adapters to C#
+### Primary goals
 
-### Secondary Goals
-- Compatibility with existing ioBroker adapters (up to 10 simultaneously)  
-- Minimal hardware requirements for Raspberry Pi 5  
-- Clean separation between internal and external routing  
-- Modular, extensible, future‑proof system design
+- Replace the historical ioBroker architecture with a modern C# state matrix.
+- Run legacy Node.js adapters in isolated processes.
+- Provide a drop-in `@iobroker/adapter-core` replacement so unmodified legacy adapters can run without js-controller over the TCP bridge.
+- Provide a unified adapter API for all adapter types.
+- Build a stable, object-oriented real-time state-sync engine.
+- Provide a new Admin UI in C#.
+- Support long-term migration of popular ioBroker adapters to C#.
+
+### Secondary goals
+
+- Support existing ioBroker adapters, with up to 10 running simultaneously.
+- Keep hardware requirements minimal for Raspberry Pi 5.
+- Separate internal and external routing.
+- Keep the system modular, extensible, and future-proof.
 
 ## Architecture
 
-- **Neuronal storage (Matrix):** a semantic vector space holding embeddings for objects, states and history samples. ObjectTree, StateNodes and History are projections (materialized views) of it.
-- **Core:** hosts the Matrix, state-sync engine, routing, security/roles, localization and the adapter runtime. It uses **RSEV.Utilities 3.0.0.0** for lifecycle, messaging, events, process and assembly loading.
-- **Adapters:** AdminUI and all native adapters run as separate external assemblies, loaded by the core at runtime. Legacy ioBroker (Node.js) adapters run in isolated Node.js processes and talk to the core over a TCP bridge.
-- **Admin UI:** served by the core on the configured `admin.adminPort` (default `8080`).
+- **Neuronal storage (Matrix):** a semantic vector space holding embeddings for objects, states, and history samples. ObjectTree, StateNodes, and History are projections (materialized views) of it.
+- **Core:** hosts the Matrix, state-sync engine, routing, security and roles, localization, and adapter runtime. It uses **RSEV.Utilities 3.0.0.0** for lifecycle, messaging, events, process, and assembly loading.
+- **Adapters:** native C# adapters run as external assemblies loaded by the core. Legacy ioBroker (Node.js) adapters run in isolated Node.js processes and communicate with the core over a TCP bridge.
+- **Admin UI:** runs as an optional separate C# adapter. Its routes are served by the external `ioBroker-NewGen.web` adapter on `web.listenHost`/`web.port` (default `127.0.0.1:8080`).
 
-## Repository Structure
+The optional native Admin UI adapter can be downloaded by a developer from
+[`MrRSEV/ioBroker-NewGen.admin`](https://github.com/MrRSEV/ioBroker-NewGen.admin)
+and added manually as `AdminUI.dll`.
 
-| Folder | Content |
-|--------|---------|
-| [ioBroker-NewGen.core](./ioBroker-NewGen.core) | Core application: Matrix, data structures, adapter configuration, legacy adapter runtime. See its [README](./ioBroker-NewGen.core/README.md). |
-| [ioBroker-NewGen.adapters](./ioBroker-NewGen.adapters) | Native C# adapters (`custom`). `lagacy` holds local legacy ioBroker sources and is not tracked. |
+## Repositories
+
+The project is split into local repositories. These links point to sibling folders in a local workspace; remote URLs can be added when they are provided.
+
+- [ioBroker-NewGen.runtime](../ioBroker-NewGen.runtime/README.md) — the core application, including the Matrix, data structures, adapter configuration, and legacy adapter runtime.
+- [ioBroker-NewGen.admin](../ioBroker-NewGen.admin/README.md) — the Admin UI custom adapter.
+
 
 ## MIT License
 

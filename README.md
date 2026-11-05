@@ -40,7 +40,7 @@ and added manually as `AdminUI.dll`.
 
 The project is split into local repositories. These links point to sibling folders in a local workspace; remote URLs can be added when they are provided.
 
-- [MrRSEV/ioBroker-NewGen.runtime](https://github.com/MrRSEV/ioBroker-NewGen.runtime/blob/master/README.md)) — the core application, including the Matrix, data structures, adapter configuration, and legacy adapter runtime.
+- [MrRSEV/ioBroker-NewGen.runtime](https://github.com/MrRSEV/ioBroker-NewGen.runtime/blob/master/README.md) — the core application, including the Matrix, data structures, adapter configuration, and legacy adapter runtime.
 - [MrRSEV/ioBroker-NewGen.admin](https://github.com/MrRSEV/ioBroker-NewGen.admin/blob/master/README.md) — the Admin UI custom adapter.
 
 

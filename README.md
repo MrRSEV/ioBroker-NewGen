@@ -1,4 +1,4 @@
-# ioBroker-NewGen
+# ioBroker-NewGen Unofficial community project
 
 > **Unofficial community project.** This project is not affiliated with or endorsed by the official ioBroker project.
 
